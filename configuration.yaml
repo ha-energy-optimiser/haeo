@@ -1,0 +1,9 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+discovery:
+demo:
+
+logger:
+  default: info
+  logs:
+    homeassistant.loader: debug

@@ -1,0 +1,118 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Home Assistant Energy Optimization",
+        "description": "Set up your energy optimization network",
+        "menu_options": {
+          "add_entity": "Add Entity",
+          "add_connection": "Add Connection",
+          "finish": "Finish Setup"
+        }
+      },
+      "add_entity": {
+        "title": "Add Entity",
+        "description": "Add a new entity to your energy network",
+        "data": {
+          "name": "Entity Name",
+          "entity_type": "Entity Type"
+        }
+      },
+      "configure_battery": {
+        "title": "Configure Battery",
+        "description": "Configure battery parameters",
+        "data": {
+          "capacity": "Capacity (Wh)",
+          "initial_charge_percentage": "Initial Charge (%)",
+          "min_charge_percentage": "Minimum Charge (%)",
+          "max_charge_percentage": "Maximum Charge (%)",
+          "max_charge_power": "Maximum Charge Power (W)",
+          "max_discharge_power": "Maximum Discharge Power (W)",
+          "efficiency": "Efficiency (0-1)"
+        }
+      },
+      "configure_grid": {
+        "title": "Configure Grid Connection",
+        "description": "Configure grid import/export limits",
+        "data": {
+          "import_limit": "Import Limit (W)",
+          "export_limit": "Export Limit (W)"
+        }
+      },
+      "configure_forecast_entity": {
+        "title": "Configure {entity_type}",
+        "description": "Configure forecast entity parameters"
+      },
+      "add_connection": {
+        "title": "Add Connection",
+        "description": "Connect two entities in the network",
+        "data": {
+          "source": "Source Entity",
+          "target": "Target Entity",
+          "min_power": "Minimum Power (W)",
+          "max_power": "Maximum Power (W)"
+        }
+      },
+      "finish": {
+        "title": "Setup Complete",
+        "description": "Review your configuration and finish setup"
+      }
+    },
+    "error": {
+      "name_exists": "An entity with this name already exists",
+      "same_entity": "Source and target cannot be the same entity",
+      "connection_exists": "This connection already exists",
+      "no_entities": "You must add at least one entity before proceeding",
+      "unknown": "Unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Energy Optimization Options",
+        "description": "Configure advanced options for the energy optimization integration"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "optimization_cost": {
+        "name": "Optimization Cost"
+      },
+      "optimization_status": {
+        "name": "Optimization Status"
+      },
+      "entity_power_consumption": {
+        "name": "{entity_name} Power Consumption"
+      },
+      "entity_power_production": {
+        "name": "{entity_name} Power Production"
+      },
+      "entity_net_power": {
+        "name": "{entity_name} Net Power"
+      },
+      "entity_power": {
+        "name": "{entity_name} Power"
+      },
+      "entity_energy": {
+        "name": "{entity_name} Energy"
+      },
+      "connection_power": {
+        "name": "{source} to {target} Power Flow"
+      }
+    }
+  },
+  "services": {
+    "optimize": {
+      "name": "Run Optimization",
+      "description": "Manually trigger an optimization run"
+    },
+    "update_config": {
+      "name": "Update Configuration",
+      "description": "Update the network configuration"
+    }
+  }
+}

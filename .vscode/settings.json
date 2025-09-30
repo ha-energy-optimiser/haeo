@@ -1,0 +1,19 @@
+{
+  "editor.formatOnSave": true,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+  "files.eol": "\n",
+  "python.analysis.typeCheckingMode": "standard",
+  "files.associations": {
+    "*.yaml": "home-assistant"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
+}

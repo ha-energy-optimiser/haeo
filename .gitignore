@@ -1,0 +1,27 @@
+# artifacts
+__pycache__
+.pytest*
+*.egg-info
+*/build/*
+*/dist/*
+
+# virtual environments
+.venv
+
+# misc
+.coverage
+coverage.xml
+.ruff_cache
+.pytest_cache
+.mypy_cache
+
+
+# Home Assistant configuration
+config/*
+!config/configuration.yaml
+home-assistant*
+known_devices.yaml
+.HA_VERSION
+.storage
+.cloud
+.storage/core.restore_state
