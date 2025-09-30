@@ -14,6 +14,8 @@ from custom_components.haeo.const import (
     CONF_CONNECTIONS,
     CONF_ENTITY_TYPE,
     CONF_ENTITY_CONFIG,
+    ENTITY_TYPE_BATTERY,
+    ENTITY_TYPE_GRID,
 )
 
 
@@ -26,7 +28,7 @@ def mock_config_entry():
             CONF_ENTITIES: [
                 {
                     CONF_NAME: "test_battery",
-                    CONF_ENTITY_TYPE: "battery",
+                    CONF_ENTITY_TYPE: ENTITY_TYPE_BATTERY,
                     CONF_ENTITY_CONFIG: {
                         "capacity": 10000,
                         "initial_charge_percentage": 50,
@@ -34,7 +36,7 @@ def mock_config_entry():
                 },
                 {
                     CONF_NAME: "test_grid",
-                    CONF_ENTITY_TYPE: "grid",
+                    CONF_ENTITY_TYPE: ENTITY_TYPE_GRID,
                     CONF_ENTITY_CONFIG: {
                         "import_limit": 10000,
                         "export_limit": 5000,

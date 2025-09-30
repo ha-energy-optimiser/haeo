@@ -24,6 +24,7 @@ class Entity:
 
     energy: Sequence[LpVariable | float] | None = None
     efficiency: float = 1.0
+    forecast: Sequence[float] | None = None
 
     def constraints(self) -> Sequence[LpConstraint]:
         """Return constraints for the entity."""
@@ -37,7 +38,7 @@ class Entity:
                 energy_change = (
                     self.power_consumption[t - 1] * self.efficiency - self.power_production[t - 1] / self.efficiency
                 ) * (self.period / 3600)
-                constraints.append(self.energy[t] == self.energy[t - 1] + energy_change)
+                constraints.append(self.energy[t] == self.energy[t - 1] + energy_change)  # type: ignore[arg-type]
 
         return constraints
 

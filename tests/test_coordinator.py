@@ -9,12 +9,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.haeo.coordinator import HaeoDataUpdateCoordinator
 from custom_components.haeo.const import (
     DOMAIN,
-    CONF_ENTITIES,
-    CONF_CONNECTIONS,
-    CONF_ENTITY_TYPE,
-    CONF_ENTITY_CONFIG,
+    ENTITY_TYPE_BATTERY,
+    ENTITY_TYPE_GRID,
     OPTIMIZATION_STATUS_SUCCESS,
     OPTIMIZATION_STATUS_FAILED,
+    ATTR_POWER_CONSUMPTION,
+    ATTR_POWER_PRODUCTION,
 )
 
 
@@ -24,32 +24,29 @@ def mock_config_entry():
     return MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_ENTITIES: [
-                {
-                    "name": "test_battery",
-                    CONF_ENTITY_TYPE: "battery",
-                    CONF_ENTITY_CONFIG: {
-                        "capacity": 10000,
-                        "initial_charge_percentage": 50,
-                    },
+            "integration_type": "hub",
+            "name": "Power Network",
+            "participants": {
+                "test_battery": {
+                    "type": ENTITY_TYPE_BATTERY,
+                    "capacity": 10000,
+                    "initial_charge_percentage": 50,
                 },
-                {
-                    "name": "test_grid",
-                    CONF_ENTITY_TYPE: "grid",
-                    CONF_ENTITY_CONFIG: {
-                        "import_limit": 10000,
-                        "export_limit": 5000,
-                        "price_import": [0.1] * 24,
-                        "price_export": [0.05] * 24,
-                    },
+                "test_grid": {
+                    "type": ENTITY_TYPE_GRID,
+                    "import_limit": 10000,
+                    "export_limit": 5000,
+                    "price_import": [0.1] * 24,
+                    "price_export": [0.05] * 24,
                 },
-            ],
-            CONF_CONNECTIONS: [
-                {
+            },
+            "connections": {
+                "test_connection": {
                     "source": "test_battery",
                     "target": "test_grid",
+                    "max_power": 5000,
                 }
-            ],
+            },
         },
         entry_id="test_entry_id",
     )
@@ -75,7 +72,7 @@ async def test_build_network(hass: HomeAssistant, mock_config_entry):
     assert coordinator.network is not None
     assert "test_battery" in coordinator.network.entities
     assert "test_grid" in coordinator.network.entities
-    assert len(coordinator.network.connections) == 1
+    assert len(coordinator.network.connections) == 0  # No automatic connections created
 
 
 async def test_get_sensor_forecast_with_forecast_attribute(hass: HomeAssistant, mock_config_entry):
@@ -135,6 +132,40 @@ async def test_update_data_success(mock_optimize, hass: HomeAssistant, mock_conf
     assert coordinator.optimization_result["cost"] == mock_cost
 
 
+async def test_build_network_with_battery_sensor(hass: HomeAssistant):
+    """Test building network with battery sensor configuration."""
+
+    # Create a config entry with battery that has current charge sensor
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "integration_type": "hub",
+            "name": "Power Network",
+            "participants": {
+                "test_battery": {
+                    "type": ENTITY_TYPE_BATTERY,
+                    "capacity": 10000,
+                    "initial_charge_percentage": 50,
+                    "current_charge_sensor": "sensor.battery_charge",
+                    "max_charge_power": 5000,
+                    "max_discharge_power": 5000,
+                }
+            },
+        },
+    )
+
+    # Create coordinator
+    coordinator = HaeoDataUpdateCoordinator(hass, config_entry)
+
+    # Mock the sensor value
+    with patch.object(coordinator, "_get_sensor_value", return_value=75.0) as mock_get_sensor:
+        # Build the network - this should trigger the sensor reading logic
+        await coordinator._build_network()
+
+        # Verify sensor was called
+        mock_get_sensor.assert_called_with("sensor.battery_charge")
+
+
 @patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator._run_optimization")
 async def test_update_data_failure(mock_optimize, hass: HomeAssistant, mock_config_entry):
     """Test failed data update."""
@@ -159,7 +190,7 @@ def test_get_entity_data(hass: HomeAssistant, mock_config_entry):
 
     coordinator.network = Network("test", period=3600, n_periods=3)
     coordinator.network.add(
-        "battery",
+        ENTITY_TYPE_BATTERY,
         "test_battery",
         capacity=1000,
         initial_charge_percentage=50,
@@ -173,11 +204,11 @@ def test_get_entity_data(hass: HomeAssistant, mock_config_entry):
     result = coordinator.get_entity_data("test_battery")
 
     assert result is not None
-    assert "power_consumption" in result
-    assert "power_production" in result
+    assert ATTR_POWER_CONSUMPTION in result
+    assert ATTR_POWER_PRODUCTION in result
     assert "energy" in result
-    assert len(result["power_consumption"]) == 3
-    assert len(result["power_production"]) == 3
+    assert len(result[ATTR_POWER_CONSUMPTION]) == 3
+    assert len(result[ATTR_POWER_PRODUCTION]) == 3
     assert len(result["energy"]) == 3
 
 
@@ -199,7 +230,7 @@ def test_get_connection_data(hass: HomeAssistant, mock_config_entry):
 
     coordinator.network = Network("test", period=3600, n_periods=3)
     coordinator.network.add(
-        "battery",
+        ENTITY_TYPE_BATTERY,
         "test_battery",
         capacity=1000,
         initial_charge_percentage=50,
@@ -207,7 +238,12 @@ def test_get_connection_data(hass: HomeAssistant, mock_config_entry):
         max_discharge_power=100,
     )
     coordinator.network.add(
-        "grid", "test_grid", import_limit=1000, export_limit=1000, price_import=[0.1] * 3, price_export=[0.05] * 3
+        ENTITY_TYPE_GRID,
+        "test_grid",
+        import_limit=1000,
+        export_limit=1000,
+        price_import=[0.1] * 3,
+        price_export=[0.05] * 3,
     )
 
     # Connect the entities

@@ -13,14 +13,10 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
-    CONF_ENTITIES,
-    CONF_CONNECTIONS,
-    CONF_ENTITY_TYPE,
-    CONF_ENTITY_CONFIG,
-    CONF_SOURCE,
-    CONF_TARGET,
-    CONF_MIN_POWER,
-    CONF_MAX_POWER,
+    ENTITY_TYPE_BATTERY,
+    ENTITY_TYPE_GRID,
+    ENTITY_TYPE_GENERATOR,
+    ENTITY_TYPE_LOAD,
     CONF_SENSORS,
     CONF_SENSOR_ENTITY_ID,
     CONF_SENSOR_ATTRIBUTE,
@@ -30,6 +26,9 @@ from .const import (
     CONF_PRICE_EXPORT,
     CONF_PRICE_IMPORT_SENSOR,
     CONF_PRICE_EXPORT_SENSOR,
+    CONF_FORECAST_SENSORS,
+    ATTR_POWER_CONSUMPTION,
+    ATTR_POWER_PRODUCTION,
     DEFAULT_PERIOD,
     DEFAULT_N_PERIODS,
     DEFAULT_UPDATE_INTERVAL,
@@ -110,17 +109,24 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             n_periods=DEFAULT_N_PERIODS,
         )
 
-        # Add entities
-        for entity_config in self.config[CONF_ENTITIES]:
-            entity_name = entity_config["name"]
-            entity_type = entity_config[CONF_ENTITY_TYPE]
-            entity_params = entity_config.get(CONF_ENTITY_CONFIG, {})
+        # Get participants from hub configuration
+        participants = self.config.get("participants", {})
+
+        if not participants:
+            _LOGGER.warning("No participants configured for hub")
+            return
+
+        # Add entities from participants
+        for entity_name, entity_config in participants.items():
+            entity_type = entity_config["type"]
+            entity_params = entity_config.copy()
+            entity_params.pop("type", None)  # Remove type key as it's not a constructor parameter
 
             _LOGGER.debug("Adding entity: %s (%s)", entity_name, entity_type)
 
             try:
                 # Handle battery entities - use current charge from sensor
-                if entity_type == "battery":
+                if entity_type == ENTITY_TYPE_BATTERY:
                     if CONF_CURRENT_CHARGE_SENSOR in entity_params:
                         current_charge_sensor = entity_params[CONF_CURRENT_CHARGE_SENSOR]
                         current_charge = await self._get_sensor_value(current_charge_sensor)
@@ -131,7 +137,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         entity_params.pop(CONF_CURRENT_CHARGE_SENSOR, None)
 
                 # Handle grid entities - need price arrays
-                if entity_type == "grid":
+                if entity_type == ENTITY_TYPE_GRID:
                     # Handle pricing from sensors or constants
                     import_price_array = None
                     export_price_array = None
@@ -177,52 +183,51 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER.error("Failed to add entity %s: %s", entity_name, ex)
                 raise
 
-        # Add connections
-        for connection_config in self.config.get(CONF_CONNECTIONS, []):
-            source = connection_config[CONF_SOURCE]
-            target = connection_config[CONF_TARGET]
-            min_power = connection_config.get(CONF_MIN_POWER)
-            max_power = connection_config.get(CONF_MAX_POWER)
-
-            _LOGGER.debug("Adding connection: %s -> %s", source, target)
-
-            try:
-                self.network.connect(source, target, min_power, max_power)
-            except Exception as ex:
-                _LOGGER.error("Failed to add connection %s -> %s: %s", source, target, ex)
-                raise
-
     async def _collect_sensor_data(self) -> None:
         """Collect data from Home Assistant sensors and update network entities."""
         if not self.network:
             return
 
-        for entity_config in self.config[CONF_ENTITIES]:
-            entity_name = entity_config["name"]
-            entity_type = entity_config[CONF_ENTITY_TYPE]
-            entity_params = entity_config.get(CONF_ENTITY_CONFIG, {})
+        # Get participants from hub configuration
+        participants = self.config.get("participants", {})
 
-            # Note: Forecast updates require recreating entities
-            # For now, forecast data is set during entity creation and remains static
-            # TODO: Add support for dynamic forecast updates in future versions
+        for entity_name, entity_config in participants.items():
+            entity_type = entity_config["type"]
 
-            # Update price data from sensors for grid entities
-            if entity_type == "grid":
-                if CONF_PRICE_IMPORT_SENSOR in entity_params:
-                    price_import_data = await self._get_sensor_forecast(entity_params[CONF_PRICE_IMPORT_SENSOR])
+            # Update dynamic sensor data for all entity types with forecast/price sensors
+            if entity_type == ENTITY_TYPE_GRID:
+                # Update price data from sensors for grid entities
+                if CONF_PRICE_IMPORT_SENSOR in entity_config:
+                    price_import_data = await self._get_sensor_forecast(entity_config[CONF_PRICE_IMPORT_SENSOR])
                     if price_import_data:
                         entity = self.network.entities[entity_name]
                         entity.price_production = price_import_data
 
-                if CONF_PRICE_EXPORT_SENSOR in entity_params:
-                    price_export_data = await self._get_sensor_forecast(entity_params[CONF_PRICE_EXPORT_SENSOR])
+                if CONF_PRICE_EXPORT_SENSOR in entity_config:
+                    price_export_data = await self._get_sensor_forecast(entity_config[CONF_PRICE_EXPORT_SENSOR])
                     if price_export_data:
                         entity = self.network.entities[entity_name]
                         entity.price_consumption = price_export_data
 
+            elif entity_type in [ENTITY_TYPE_GENERATOR, ENTITY_TYPE_LOAD]:
+                # Update forecast data from sensors
+                forecast_sensors = entity_config.get(CONF_FORECAST_SENSORS, [])
+                if forecast_sensors:
+                    # Get forecast data from all sensors
+                    forecast_data = [
+                        sensor_data
+                        for sensor in forecast_sensors
+                        if (sensor_data := await self._get_sensor_forecast(sensor))
+                    ]
+
+                    if forecast_data:
+                        # Use the first sensor's data
+                        entity = self.network.entities[entity_name]
+                        entity.forecast = forecast_data[0]
+
             # Update data from configured sensors
-            if CONF_SENSORS in entity_params:
-                for sensor_config in entity_params[CONF_SENSORS]:
+            if CONF_SENSORS in entity_config:
+                for sensor_config in entity_config[CONF_SENSORS]:
                     sensor_data = await self._get_sensor_data(sensor_config)
                     if sensor_data:
                         # Process sensor data based on entity type and sensor configuration
@@ -324,10 +329,10 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Get power consumption/production/energy values
         if entity.power_consumption is not None:
-            entity_data["power_consumption"] = extract_values(entity.power_consumption)
+            entity_data[ATTR_POWER_CONSUMPTION] = extract_values(entity.power_consumption)
 
         if entity.power_production is not None:
-            entity_data["power_production"] = extract_values(entity.power_production)
+            entity_data[ATTR_POWER_PRODUCTION] = extract_values(entity.power_production)
 
         if entity.energy is not None:
             entity_data["energy"] = extract_values(entity.energy)

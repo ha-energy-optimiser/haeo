@@ -62,13 +62,13 @@ class Network:
         Returns:
             The created connection
         """
-        if source_name not in self.entities:
-            raise ValueError(f"Source entity '{source_name}' not found in network")
-        if target_name not in self.entities:
-            raise ValueError(f"Target entity '{target_name}' not found in network")
+        source_entity = self.entities.get(source_name)
+        target_entity = self.entities.get(target_name)
 
-        source_entity = self.entities[source_name]
-        target_entity = self.entities[target_name]
+        if not source_entity:
+            raise ValueError(f"Source entity '{source_name}' not found in network")
+        if not target_entity:
+            raise ValueError(f"Target entity '{target_name}' not found in network")
 
         connection = Connection(
             period=self.period,
@@ -80,8 +80,7 @@ class Network:
         )
 
         # Store connection using tuple of names as key
-        connection_key = (source_name, target_name)
-        self.connections[connection_key] = connection
+        self.connections[(source_name, target_name)] = connection
 
         return connection
 

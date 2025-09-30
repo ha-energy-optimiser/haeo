@@ -19,8 +19,12 @@ from .const import (
     CONF_ENTITIES,
     CONF_CONNECTIONS,
     DOMAIN,
+    ENTITY_TYPE_LOAD,
+    ENTITY_TYPE_GENERATOR,
     OPTIMIZATION_STATUS_SUCCESS,
     UNIT_CURRENCY,
+    ATTR_POWER_CONSUMPTION,
+    ATTR_POWER_PRODUCTION,
 )
 from .coordinator import HaeoDataUpdateCoordinator
 
@@ -53,11 +57,11 @@ async def async_setup_entry(
             return f"{entity_name}_{data_type}" in solution
 
         # Add power consumption sensor if entity has this capability
-        if has_data_type("power_consumption"):
+        if has_data_type(ATTR_POWER_CONSUMPTION):
             entities.append(HaeoEntityPowerConsumptionSensor(coordinator, config_entry, entity_name))
 
         # Add power production sensor if entity has this capability
-        if has_data_type("power_production"):
+        if has_data_type(ATTR_POWER_PRODUCTION):
             entities.append(HaeoEntityPowerProductionSensor(coordinator, config_entry, entity_name))
 
         # Add net power sensor if entity has both consumption and production
@@ -117,6 +121,14 @@ class HaeoOptimizationCostSensor(HaeoSensorBase):
         self._attr_device_class = SensorDeviceClass.MONETARY
         self._attr_native_unit_of_measurement = UNIT_CURRENCY
         self._attr_state_class = SensorStateClass.MEASUREMENT
+
+        # Set initial values from coordinator
+        self._attr_native_value = self.coordinator.last_optimization_cost
+        attrs = {}
+        if self.coordinator.last_optimization_time:
+            attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
+        attrs["optimization_status"] = self.coordinator.optimization_status
+        self._attr_extra_state_attributes = attrs
 
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
@@ -186,9 +198,9 @@ class HaeoEntityPowerConsumptionSensor(HaeoSensorBase):
     def native_value(self) -> float | None:
         """Return the current power consumption."""
         entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "power_consumption" in entity_data:
+        if entity_data and ATTR_POWER_CONSUMPTION in entity_data:
             # Return the current period's value (first value)
-            consumption_data = entity_data["power_consumption"]
+            consumption_data = entity_data[ATTR_POWER_CONSUMPTION]
             return consumption_data[0] if consumption_data else None
         return None
 
@@ -197,8 +209,8 @@ class HaeoEntityPowerConsumptionSensor(HaeoSensorBase):
         """Return extra state attributes."""
         attrs = {}
         entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "power_consumption" in entity_data:
-            consumption_data = entity_data["power_consumption"]
+        if entity_data and ATTR_POWER_CONSUMPTION in entity_data:
+            consumption_data = entity_data[ATTR_POWER_CONSUMPTION]
             timestamps = self.coordinator.get_future_timestamps()
 
             # Add forecast data
@@ -234,9 +246,9 @@ class HaeoEntityPowerProductionSensor(HaeoSensorBase):
     def native_value(self) -> float | None:
         """Return the current power production."""
         entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "power_production" in entity_data:
+        if entity_data and ATTR_POWER_PRODUCTION in entity_data:
             # Return the current period's value (first value)
-            production_data = entity_data["power_production"]
+            production_data = entity_data[ATTR_POWER_PRODUCTION]
             return production_data[0] if production_data else None
         return None
 
@@ -245,8 +257,8 @@ class HaeoEntityPowerProductionSensor(HaeoSensorBase):
         """Return extra state attributes."""
         attrs = {}
         entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "power_production" in entity_data:
-            production_data = entity_data["power_production"]
+        if entity_data and ATTR_POWER_PRODUCTION in entity_data:
+            production_data = entity_data[ATTR_POWER_PRODUCTION]
             timestamps = self.coordinator.get_future_timestamps()
 
             # Add forecast data
@@ -320,11 +332,11 @@ class HaeoEntityPowerSensor(HaeoSensorBase):
         entity_data = self.coordinator.get_entity_data(self.entity_name)
         if entity_data:
             # For loads, check power_consumption; for generators, check power_production
-            if self.entity_type == "load" and "power_consumption" in entity_data:
-                power_data = entity_data["power_consumption"]
+            if self.entity_type == ENTITY_TYPE_LOAD and ATTR_POWER_CONSUMPTION in entity_data:
+                power_data = entity_data[ATTR_POWER_CONSUMPTION]
                 return power_data[0] if power_data else None
-            elif self.entity_type == "generator" and "power_production" in entity_data:
-                power_data = entity_data["power_production"]
+            elif self.entity_type == ENTITY_TYPE_GENERATOR and ATTR_POWER_PRODUCTION in entity_data:
+                power_data = entity_data[ATTR_POWER_PRODUCTION]
                 return power_data[0] if power_data else None
         return None
 
@@ -405,19 +417,27 @@ class HaeoConnectionPowerSensor(HaeoSensorBase):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
-        attrs = {}
+        # Build attributes dict with required fields
+        attrs: dict[str, Any] = {
+            "optimization_status": self.coordinator.optimization_status,
+            "source": self.source,
+            "target": self.target,
+        }
+
+        # Add optimization timestamp if available
+        if self.coordinator.last_optimization_time:
+            attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
+
+        # Add forecast data if available
         connection_data = self.coordinator.get_connection_data(self.source, self.target)
         if connection_data:
             timestamps = self.coordinator.get_future_timestamps()
-
-            # Add forecast data
             attrs["forecast"] = connection_data
 
-            # Add timestamped forecast
+            # Add timestamped forecast if timestamps match data length
             if len(timestamps) == len(connection_data):
                 attrs["timestamped_forecast"] = [
                     {"timestamp": ts, "value": value} for ts, value in zip(timestamps, connection_data)
                 ]
-        attrs["source"] = self.source
-        attrs["target"] = self.target
+
         return attrs

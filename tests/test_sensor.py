@@ -11,9 +11,13 @@ from custom_components.haeo.const import (
     DOMAIN,
     CONF_ENTITIES,
     CONF_CONNECTIONS,
+    ENTITY_TYPE_BATTERY,
+    ENTITY_TYPE_GRID,
     OPTIMIZATION_STATUS_SUCCESS,
     OPTIMIZATION_STATUS_FAILED,
     UNIT_CURRENCY,
+    ATTR_POWER_CONSUMPTION,
+    ATTR_POWER_PRODUCTION,
 )
 from custom_components.haeo.sensor import (
     async_setup_entry,
@@ -46,8 +50,8 @@ def mock_coordinator():
         }
     }
     coordinator.get_entity_data.return_value = {
-        "power_consumption": [100.0, 150.0, 200.0],
-        "power_production": [50.0, 75.0, 100.0],
+        ATTR_POWER_CONSUMPTION: [100.0, 150.0, 200.0],
+        ATTR_POWER_PRODUCTION: [50.0, 75.0, 100.0],
         "power": [50.0, 75.0, 100.0],
         "energy": [500.0, 600.0, 700.0],
     }
@@ -68,8 +72,8 @@ def mock_config_entry():
         entry_id="test_entry",
         data={
             CONF_ENTITIES: [
-                {"name": "test_battery", "type": "battery"},
-                {"name": "test_grid", "type": "grid"},
+                {"name": "test_battery", "type": ENTITY_TYPE_BATTERY},
+                {"name": "test_grid", "type": ENTITY_TYPE_GRID},
             ],
             CONF_CONNECTIONS: [
                 {"source": "test_battery", "target": "test_grid"},
@@ -253,7 +257,7 @@ class TestHaeoEntityPowerConsumptionSensor:
 
     def test_native_value_empty_data(self, mock_coordinator, mock_config_entry):
         """Test native value when data is empty."""
-        mock_coordinator.get_entity_data.return_value = {"power_consumption": []}
+        mock_coordinator.get_entity_data.return_value = {ATTR_POWER_CONSUMPTION: []}
         sensor = HaeoEntityPowerConsumptionSensor(mock_coordinator, mock_config_entry, "test_battery")
         assert sensor.native_value is None
 
@@ -344,3 +348,15 @@ class TestHaeoConnectionPowerSensor:
         mock_coordinator.get_connection_data.return_value = []
         sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
         assert sensor.native_value is None
+
+    def test_handle_coordinator_update(self, mock_coordinator, mock_config_entry, hass):
+        """Test handling coordinator updates."""
+        sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
+        sensor.hass = hass  # Set hass attribute for the sensor
+        sensor.entity_id = "sensor.test_battery_to_test_grid_power_flow"  # Set entity_id
+
+        # Test with optimization data
+        sensor._handle_coordinator_update()
+        assert sensor.native_value == 75.0  # Should get connection data
+        assert "last_optimization" in sensor.extra_state_attributes
+        assert sensor.extra_state_attributes["optimization_status"] == OPTIMIZATION_STATUS_SUCCESS

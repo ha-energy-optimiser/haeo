@@ -1,6 +1,13 @@
 """Test the model components."""
 
 import pytest
+from custom_components.haeo.const import (
+    ENTITY_TYPE_BATTERY,
+    ENTITY_TYPE_GRID,
+    ENTITY_TYPE_LOAD,
+    ENTITY_TYPE_GENERATOR,
+    ENTITY_TYPE_NET,
+)
 from custom_components.haeo.model import Network
 from custom_components.haeo.model.battery import Battery
 from custom_components.haeo.model.grid import Grid
@@ -213,7 +220,7 @@ class TestNetwork:
             n_periods=24,
         )
 
-        battery = network.add("battery", "test_battery", capacity=10000, initial_charge_percentage=50)
+        battery = network.add(ENTITY_TYPE_BATTERY, "test_battery", capacity=10000, initial_charge_percentage=50)
 
         assert isinstance(battery, Battery)
         assert battery.name == "test_battery"
@@ -229,7 +236,7 @@ class TestNetwork:
         )
 
         grid = network.add(
-            "grid",
+            ENTITY_TYPE_GRID,
             "test_grid",
             import_limit=10000,
             export_limit=5000,
@@ -250,7 +257,7 @@ class TestNetwork:
         )
 
         load = network.add(
-            "load",
+            ENTITY_TYPE_LOAD,
             "test_load",
             forecast=[1000, 1500, 2000],
         )
@@ -268,7 +275,7 @@ class TestNetwork:
         )
 
         generator = network.add(
-            "generator",
+            ENTITY_TYPE_GENERATOR,
             "test_generator",
             forecast=[1000, 1500, 2000],
             curtailment=True,
@@ -286,7 +293,7 @@ class TestNetwork:
             n_periods=3,
         )
 
-        net = network.add("net", "test_net")
+        net = network.add(ENTITY_TYPE_NET, "test_net")
 
         assert isinstance(net, Net)
         assert net.name == "test_net"
@@ -301,9 +308,9 @@ class TestNetwork:
         )
 
         # Add entities
-        network.add("battery", "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(ENTITY_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
         network.add(
-            "grid",
+            ENTITY_TYPE_GRID,
             "grid1",
             import_limit=10000,
             export_limit=5000,
@@ -339,15 +346,15 @@ class TestNetwork:
 
         # Add a simple grid and load
         network.add(
-            "grid",
-            "grid",
+            ENTITY_TYPE_GRID,
+            ENTITY_TYPE_GRID,
             import_limit=10000,
             export_limit=5000,
             price_import=[0.1, 0.2, 0.15],
             price_export=[0.05, 0.08, 0.06],
         )
         network.add("load", "load", forecast=[1000, 1500, 2000])
-        network.add("net", "net")
+        network.add(ENTITY_TYPE_NET, "net")
 
         # Connect them: grid -> net <- load
         network.connect("grid", "net")
@@ -386,13 +393,13 @@ class TestScenarios:
 
         # Add entities
         network.add(
-            "generator", "solar", forecast=solar_forecast, curtailment=True, price_production=[0] * 8
+            ENTITY_TYPE_GENERATOR, "solar", forecast=solar_forecast, curtailment=True, price_production=[0] * 8
         )  # Solar has no fuel cost
 
         network.add("load", "load", forecast=load_forecast)
 
         network.add(
-            "battery",
+            ENTITY_TYPE_BATTERY,
             "battery",
             capacity=10000,  # 10 kWh
             initial_charge_percentage=50,
@@ -404,7 +411,7 @@ class TestScenarios:
         )
 
         network.add(
-            "grid",
+            ENTITY_TYPE_GRID,
             "grid",
             import_limit=10000,
             export_limit=10000,
@@ -412,7 +419,7 @@ class TestScenarios:
             price_export=export_prices,
         )
 
-        network.add("net", "net")
+        network.add(ENTITY_TYPE_NET, "net")
 
         # Connect everything through the net
         network.connect("solar", "net")
@@ -506,7 +513,7 @@ class TestScenarios:
 
         # Add entities
         network.add(
-            "generator",
+            ENTITY_TYPE_GENERATOR,
             "solar",
             forecast=solar_forecast,
             curtailment=True,  # Allow curtailment
@@ -516,15 +523,15 @@ class TestScenarios:
         network.add("load", "load", forecast=load_forecast)
 
         network.add(
-            "grid",
-            "grid",
+            ENTITY_TYPE_GRID,
+            ENTITY_TYPE_GRID,
             import_limit=10000,
             export_limit=10000,
             price_import=import_prices,
             price_export=export_prices,
         )
 
-        network.add("net", "net")
+        network.add(ENTITY_TYPE_NET, "net")
 
         # Connect entities
         network.connect("solar", "net")

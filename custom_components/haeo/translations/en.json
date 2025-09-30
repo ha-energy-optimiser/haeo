@@ -2,117 +2,113 @@
   "config": {
     "step": {
       "user": {
-        "title": "Home Assistant Energy Optimization",
-        "description": "Set up your energy optimization network",
-        "menu_options": {
-          "add_entity": "Add Entity",
-          "add_connection": "Add Connection",
-          "finish": "Finish Setup"
-        }
-      },
-      "add_entity": {
-        "title": "Add Entity",
-        "description": "Add a new entity to your energy network",
+        "title": "HAEO Hub Setup",
+        "description": "Create a new HAEO optimization hub. After creating the hub, you can add individual devices like batteries, grid connections, loads, and generators through the hub's configuration options.",
         "data": {
-          "name": "Entity Name",
-          "entity_type": "Entity Type"
+          "name": "Hub Name"
         }
-      },
-      "configure_battery": {
-        "title": "Configure Battery",
-        "description": "Configure battery parameters",
-        "data": {
-          "capacity": "Capacity (Wh)",
-          "initial_charge_percentage": "Initial Charge (%)",
-          "min_charge_percentage": "Minimum Charge (%)",
-          "max_charge_percentage": "Maximum Charge (%)",
-          "max_charge_power": "Maximum Charge Power (W)",
-          "max_discharge_power": "Maximum Discharge Power (W)",
-          "efficiency": "Efficiency (0-1)"
-        }
-      },
-      "configure_grid": {
-        "title": "Configure Grid Connection",
-        "description": "Configure grid import/export limits",
-        "data": {
-          "import_limit": "Import Limit (W)",
-          "export_limit": "Export Limit (W)"
-        }
-      },
-      "configure_forecast_entity": {
-        "title": "Configure {entity_type}",
-        "description": "Configure forecast entity parameters"
-      },
-      "add_connection": {
-        "title": "Add Connection",
-        "description": "Connect two entities in the network",
-        "data": {
-          "source": "Source Entity",
-          "target": "Target Entity",
-          "min_power": "Minimum Power (W)",
-          "max_power": "Maximum Power (W)"
-        }
-      },
-      "finish": {
-        "title": "Setup Complete",
-        "description": "Review your configuration and finish setup"
       }
     },
     "error": {
-      "name_exists": "An entity with this name already exists",
-      "same_entity": "Source and target cannot be the same entity",
-      "connection_exists": "This connection already exists",
-      "no_entities": "You must add at least one entity before proceeding",
-      "unknown": "Unknown error occurred"
+      "name_exists": "A hub with this name already exists"
     },
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "Hub already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Energy Optimization Options",
-        "description": "Configure advanced options for the energy optimization integration"
+        "title": "HAEO Hub Configuration",
+        "description": "Manage your HAEO hub and its connected devices",
+        "menu_options": {
+          "add_participant": "Add Device",
+          "manage_participants": "View Devices",
+          "remove_participant": "Remove Device"
+        }
+      },
+      "add_participant": {
+        "title": "Add Device",
+        "description": "Choose the type of device to add to your HAEO hub",
+        "data": {
+          "participant_type": "Device Type"
+        }
+      },
+      "manage_participants": {
+        "title": "Connected Devices",
+        "description": "Current devices connected to this hub:\n{participants}"
+      },
+      "remove_participant": {
+        "title": "Remove Device",
+        "description": "Select a device to remove from the hub",
+        "data": {
+          "participant": "Device to Remove"
+        }
+      },
+      "configure_battery": {
+        "title": "Configure Battery",
+        "description": "Set up battery parameters for energy optimization",
+        "data": {
+          "name": "Battery Name",
+          "capacity": "Capacity",
+          "initial_charge_percentage": "Initial Charge",
+          "current_charge_sensor": "Current Charge Sensor (Optional)",
+          "min_charge_percentage": "Minimum Charge Level",
+          "max_charge_percentage": "Maximum Charge Level",
+          "max_charge_power": "Maximum Charge Power",
+          "max_discharge_power": "Maximum Discharge Power",
+          "efficiency": "Round-trip Efficiency",
+          "charge_cost": "Charge Cost (Optional)",
+          "discharge_cost": "Discharge Cost (Optional)"
+        }
+      },
+      "configure_grid": {
+        "title": "Configure Grid Connection",
+        "description": "Set up grid import/export parameters and pricing",
+        "data": {
+          "name": "Grid Connection Name",
+          "import_limit": "Import Limit (Optional)",
+          "export_limit": "Export Limit (Optional)",
+          "price_import": "Import Price (Optional)",
+          "price_export": "Export Price (Optional)",
+          "price_import_sensor": "Import Price Sensor (Optional)",
+          "price_export_sensor": "Export Price Sensor (Optional)"
+        }
+      },
+      "configure_load": {
+        "title": "Configure Load",
+        "description": "Set up load forecasting and parameters",
+        "data": {
+          "name": "Load Name",
+          "forecast_sensors": "Forecast Sensors (Optional)",
+          "forecast_aggregation": "Forecast Aggregation Method",
+          "forecast_multiplier": "Forecast Multiplier"
+        }
+      },
+      "configure_generator": {
+        "title": "Configure Generator",
+        "description": "Set up generator forecasting and parameters",
+        "data": {
+          "name": "Generator Name",
+          "forecast_sensors": "Forecast Sensors (Optional)",
+          "forecast_aggregation": "Forecast Aggregation Method",
+          "forecast_multiplier": "Forecast Multiplier"
+        }
+      },
+      "configure_net": {
+        "title": "Configure Net Entity",
+        "description": "Add a net entity for power balance calculations",
+        "data": {
+          "name": "Net Entity Name"
+        }
       }
-    }
-  },
-  "entity": {
-    "sensor": {
-      "optimization_cost": {
-        "name": "Optimization Cost"
-      },
-      "optimization_status": {
-        "name": "Optimization Status"
-      },
-      "entity_power_consumption": {
-        "name": "{entity_name} Power Consumption"
-      },
-      "entity_power_production": {
-        "name": "{entity_name} Power Production"
-      },
-      "entity_net_power": {
-        "name": "{entity_name} Net Power"
-      },
-      "entity_power": {
-        "name": "{entity_name} Power"
-      },
-      "entity_energy": {
-        "name": "{entity_name} Energy"
-      },
-      "connection_power": {
-        "name": "{source} to {target} Power Flow"
-      }
-    }
-  },
-  "services": {
-    "optimize": {
-      "name": "Run Optimization",
-      "description": "Manually trigger an optimization run"
     },
-    "update_config": {
-      "name": "Update Configuration",
-      "description": "Update the network configuration"
+    "error": {
+      "name_exists": "A device with this name already exists",
+      "invalid_name": "Invalid device name"
+    },
+    "abort": {
+      "no_participants": "No devices are currently connected to this hub"
     }
   }
 }
