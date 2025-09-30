@@ -10,7 +10,7 @@ dependencies = ["numpy>=2.2.2", "pulp[open-py]>=3.3.0"]
 [dependency-groups]
 dev = [
     "pytest>=8.3.5,<=8.4.1",
-    "pytest-cov>=6.1.1,<=6.2.1",
+    "pytest-cov>=6.1.1,<=7.0.0",
     "ruff>=0.13.1",
     "mypy>=1.18.2",
     "homeassistant>=2025.4.4",
