@@ -1,4 +1,15 @@
 {
+  "entity": {
+    "device": {
+      "battery": "Battery",
+      "grid_connection": "Grid Connection",
+      "fixed_load": "Fixed Load",
+      "forecast_load": "Forecast Load",
+      "generator": "Generator",
+      "network_node": "Network Node",
+      "connection": "Connection"
+    }
+  },
   "config": {
     "step": {
       "user": {
@@ -71,8 +82,8 @@
           "export_limit": "Export Limit (Optional)",
           "price_import": "Import Price (Optional)",
           "price_export": "Export Price (Optional)",
-          "price_import_sensor": "Import Price Sensor (Optional)",
-          "price_export_sensor": "Export Price Sensor (Optional)"
+          "price_import_sensor": "Import Price Sensor",
+          "price_export_sensor": "Export Price Sensor"
         }
       },
       "configure_load": {
@@ -101,11 +112,26 @@
         "data": {
           "name": "Net Entity Name"
         }
+      },
+      "configure_connection": {
+        "title": "Configure Connection",
+        "description": "Set up connection parameters between devices. Use negative minimum power for bidirectional connections.",
+        "data": {
+          "name": "Connection Name",
+          "source": "Source Device",
+          "target": "Target Device",
+          "min_power": "Minimum Power (negative for bidirectional)",
+          "max_power": "Maximum Power"
+        }
       }
     },
     "error": {
       "name_exists": "A device with this name already exists",
-      "invalid_name": "Invalid device name"
+      "invalid_name": "Invalid device name",
+      "cannot_connect_to_self": "Cannot connect a device to itself",
+      "min_power_too_high": "Minimum power must be less than or equal to maximum power",
+      "max_power_must_be_positive_for_bidirectional": "Maximum power must be positive for bidirectional connections",
+      "min_power_negative_not_allowed_unidirectional": "Minimum power cannot be negative for unidirectional connections"
     },
     "abort": {
       "no_participants": "No devices are currently connected to this network"

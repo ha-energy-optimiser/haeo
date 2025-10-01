@@ -8,11 +8,12 @@ from custom_components.haeo.flows.options import HubOptionsFlow
 from custom_components.haeo.const import (
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_LOAD_FIXED,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_NET,
     ELEMENT_TYPE_CONNECTION,
     CONF_CAPACITY,
+    CONF_POWER,
 )
 
 from . import create_mock_config_entry
@@ -29,7 +30,7 @@ async def test_options_flow_init(hass: HomeAssistant):
     assert result.get("type") == FlowResultType.MENU
     menu_options = result.get("menu_options", [])
     assert "add_participant" in menu_options
-    assert "manage_participants" in menu_options
+    assert "edit_participant" in menu_options
     assert "remove_participant" in menu_options
 
 
@@ -64,9 +65,9 @@ async def test_options_flow_route_to_load_config(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_LOAD})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_LOAD_FIXED})
     assert result.get("type") == FlowResultType.FORM
-    assert result.get("step_id") == "configure_load"
+    assert result.get("step_id") == "configure_fixed_load"
 
 
 async def test_options_flow_route_to_generator_config(hass: HomeAssistant):
@@ -160,8 +161,8 @@ async def test_options_flow_no_participants(hass: HomeAssistant):
     options_flow = HubOptionsFlow()
     options_flow._config_entry = config_entry
 
-    # Test manage participants with no participants
-    result = await options_flow.async_step_manage_participants()
+    # Test edit participants with no participants
+    result = await options_flow.async_step_edit_participant()
     assert result.get("type") == FlowResultType.ABORT
     assert result.get("reason") == "no_participants"
 
@@ -215,7 +216,7 @@ async def test_options_flow_configure_grid_success(hass: HomeAssistant):
         mock_update.assert_called_once()
 
 
-async def test_options_flow_configure_load_success(hass: HomeAssistant):
+async def test_options_flow_configure_fixed_load_success(hass: HomeAssistant):
     """Test successful load configuration."""
     config_entry = create_mock_config_entry()
     options_flow = HubOptionsFlow()
@@ -226,17 +227,16 @@ async def test_options_flow_configure_load_success(hass: HomeAssistant):
 
     with patch.object(hass.config_entries, "async_update_entry", return_value=None):
         # Test form display
-        result = await options_flow.async_step_configure_load()
+        result = await options_flow.async_step_configure_fixed_load()
         assert result.get("type") == FlowResultType.FORM
-        assert result.get("step_id") == "configure_load"
+        assert result.get("step_id") == "configure_fixed_load"
 
         # Test successful submission
         load_data = {
             CONF_NAME: "House Load",
-            "load_type": "fixed",
-            "power": 2000,
+            CONF_POWER: 2000,
         }
-        result = await options_flow.async_step_configure_load(load_data)
+        result = await options_flow.async_step_configure_fixed_load(load_data)
         assert result.get("type") == FlowResultType.CREATE_ENTRY
 
 
@@ -343,12 +343,12 @@ async def test_options_flow_grid_duplicate_name(hass: HomeAssistant):
         assert result["errors"].get(CONF_NAME) == "name_exists"
 
 
-async def test_options_flow_load_duplicate_name(hass: HomeAssistant):
+async def test_options_flow_fixed_load_duplicate_name(hass: HomeAssistant):
     """Test load configuration with duplicate name."""
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Existing Load": {"type": ELEMENT_TYPE_LOAD}},
+        "participants": {"Existing Load": {"type": ELEMENT_TYPE_LOAD_FIXED}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -356,10 +356,9 @@ async def test_options_flow_load_duplicate_name(hass: HomeAssistant):
 
     load_data = {
         CONF_NAME: "Existing Load",  # Duplicate name
-        "load_type": "fixed",
-        "power": 2000,
+        CONF_POWER: 2000,
     }
-    result = await options_flow.async_step_configure_load(load_data)
+    result = await options_flow.async_step_configure_fixed_load(load_data)
     assert result.get("type") == FlowResultType.FORM
     if "errors" in result and result["errors"]:
         assert result["errors"].get(CONF_NAME) == "name_exists"
@@ -544,13 +543,13 @@ async def test_options_flow_manage_participants_form(hass: HomeAssistant):
     options_flow._config_entry = config_entry
 
     # Test form display
-    result = await options_flow.async_step_manage_participants()
+    result = await options_flow.async_step_edit_participant()
     assert result.get("type") == FlowResultType.FORM
-    assert result.get("step_id") == "manage_participants"
+    assert result.get("step_id") == "edit_participant"
 
 
-async def test_options_flow_manage_participants_success(hass: HomeAssistant):
-    """Test manage participants selection."""
+async def test_options_flow_edit_participants_success(hass: HomeAssistant):
+    """Test edit participants selection."""
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
@@ -564,23 +563,24 @@ async def test_options_flow_manage_participants_success(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    # Test participant selection
+    # Test participant selection - should route to battery edit form
     participant_data = {
         "participant": "Battery1",
     }
-    result = await options_flow.async_step_manage_participants(participant_data)
-    assert result.get("type") == FlowResultType.CREATE_ENTRY
+    result = await options_flow.async_step_edit_participant(participant_data)
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "edit_battery"
 
 
-async def test_options_flow_manage_participants_no_participants(hass: HomeAssistant):
-    """Test manage participants with no participants."""
+async def test_options_flow_edit_participant_no_participants(hass: HomeAssistant):
+    """Test edit participants with no participants."""
     config_entry = create_mock_config_entry()  # Empty participants
     options_flow = HubOptionsFlow()
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
     # Test no participants case
-    result = await options_flow.async_step_manage_participants()
+    result = await options_flow.async_step_edit_participant()
     assert result.get("type") == FlowResultType.ABORT
     assert result.get("reason") == "no_participants"
     """Test connection configuration with duplicate name."""

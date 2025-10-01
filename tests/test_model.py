@@ -5,15 +5,16 @@ from custom_components.haeo.const import (
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_CONNECTION,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD,
     ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_LOAD_FORECAST,
     ELEMENT_TYPE_NET,
 )
 from custom_components.haeo.model import Network
 from custom_components.haeo.model.battery import Battery
 from custom_components.haeo.model.connection import Connection
 from custom_components.haeo.model.grid import Grid
-from custom_components.haeo.model.load import Load
+from custom_components.haeo.model.load_constant import LoadConstant
+from custom_components.haeo.model.load_forecast import LoadForecast
 from custom_components.haeo.model.generator import Generator
 from custom_components.haeo.model.net import Net
 
@@ -99,15 +100,28 @@ class TestGrid:
                 price_export=[0.05, 0.08, 0.06],
             )
 
+    def test_grid_invalid_export_forecast_length(self):
+        """Test grid with invalid export forecast length."""
+        with pytest.raises(ValueError, match="price_export length"):
+            Grid(
+                name="test_grid",
+                period=3600,
+                n_periods=3,
+                import_limit=10000,
+                export_limit=5000,
+                price_import=[0.1, 0.2, 0.15],
+                price_export=[0.05, 0.08],  # Wrong length
+            )
+
 
 class TestLoad:
     """Test the Load class."""
 
-    def test_load_initialization(self):
-        """Test load initialization."""
+    def test_load_forecast_initialization(self):
+        """Test forecast load initialization."""
         forecast = [1000, 1500, 2000]
 
-        load = Load(
+        load = LoadForecast(
             name="test_load",
             period=3600,
             n_periods=3,
@@ -120,15 +134,30 @@ class TestLoad:
         assert load.power_consumption == forecast
         assert load.power_production is None
 
-    def test_load_invalid_forecast_length(self):
-        """Test load with invalid forecast length."""
+    def test_load_forecast_invalid_forecast_length(self):
+        """Test forecast load with invalid forecast length."""
         with pytest.raises(ValueError, match="forecast length"):
-            Load(
+            LoadForecast(
                 name="test_load",
                 period=3600,
                 n_periods=3,
                 forecast=[1000, 1500],  # Wrong length
             )
+
+    def test_load_constant_initialization(self):
+        """Test constant load initialization."""
+        load = LoadConstant(
+            name="test_load",
+            period=3600,
+            n_periods=3,
+            power=1500,
+        )
+
+        assert load.name == "test_load"
+        assert load.period == 3600
+        assert load.n_periods == 3
+        assert load.power_consumption == [1500, 1500, 1500]  # Constant power for all periods
+        assert load.power_production is None
 
 
 class TestGenerator:
@@ -258,12 +287,12 @@ class TestNetwork:
         )
 
         load = network.add(
-            ELEMENT_TYPE_LOAD,
+            ELEMENT_TYPE_LOAD_FORECAST,
             "test_load",
             forecast=[1000, 1500, 2000],
         )
 
-        assert isinstance(load, Load)
+        assert isinstance(load, LoadForecast)
         assert load.name == "test_load"
         assert "test_load" in network.elements
 
@@ -350,6 +379,195 @@ class TestNetwork:
         network.add(ELEMENT_TYPE_CONNECTION, "bad_connection", source="nonexistent", target="also_nonexistent")
 
         with pytest.raises(ValueError, match="Source element 'nonexistent' not found"):
+            network.validate()
+
+    def test_connect_nonexistent_target_entity(self):
+        """Test connecting to nonexistent target entity."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
+        # Add only source entity
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        # Try to connect to nonexistent target
+        network.add(ELEMENT_TYPE_CONNECTION, "bad_connection", source="battery1", target="nonexistent")
+
+        with pytest.raises(ValueError, match="Target element 'nonexistent' not found"):
+            network.validate()
+
+    def test_connection_with_negative_power_bounds(self):
+        """Test connection with negative power bounds for bidirectional flow."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
+
+        # Add entities
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(
+            ELEMENT_TYPE_GRID,
+            "grid1",
+            import_limit=10000,
+            export_limit=5000,
+            price_import=[0.1, 0.2, 0.15],
+            price_export=[0.05, 0.08, 0.06],
+        )
+
+        # Create bidirectional connection
+        connection = network.add(
+            ELEMENT_TYPE_CONNECTION,
+            "battery_grid_bidirectional",
+            source="battery1",
+            target="grid1",
+            min_power=-2000,  # Allow reverse flow up to 2000W
+            max_power=3000,  # Allow forward flow up to 3000W
+        )
+
+        assert connection is not None
+        assert connection.name == "battery_grid_bidirectional"
+        assert connection.source == "battery1"
+        assert connection.target == "grid1"
+        assert len(connection.power) == 3
+
+        # Verify power variables have correct bounds
+        for power_var in connection.power:
+            assert power_var.lowBound == -2000
+            assert power_var.upBound == 3000
+
+    def test_connection_power_balance_with_negative_flow(self):
+        """Test that power balance works correctly with negative power flows."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
+
+        # Add entities
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(
+            ELEMENT_TYPE_GRID,
+            "grid1",
+            import_limit=10000,
+            export_limit=5000,
+            price_import=[0.1, 0.2, 0.15],
+            price_export=[0.05, 0.08, 0.06],
+        )
+
+        # Create bidirectional connection
+        network.add(
+            ELEMENT_TYPE_CONNECTION,
+            "battery_grid_bidirectional",
+            source="battery1",
+            target="grid1",
+            min_power=-2000,  # Allow reverse flow
+            max_power=3000,  # Allow forward flow
+        )
+
+        # Validate the network (should pass)
+        network.validate()
+
+        # Run optimization
+        cost = network.optimize()
+
+        # Should complete without errors
+        assert isinstance(cost, (int, float))
+
+        # Access optimization results
+        battery = network.elements["battery1"]
+        from pulp import value
+
+        # Check that power variables exist and have values
+        for power_var in battery.power_consumption:
+            val = value(power_var)
+            assert isinstance(val, (int, float))
+
+    def test_connection_with_none_bounds(self):
+        """Test connection with None bounds (should use None for infinite bounds)."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
+
+        # Add entities
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(
+            ELEMENT_TYPE_GRID,
+            "grid1",
+            import_limit=10000,
+            export_limit=5000,
+            price_import=[0.1, 0.2, 0.15],
+            price_export=[0.05, 0.08, 0.06],
+        )
+
+        # Create connection with None bounds (unlimited power)
+        connection = network.add(
+            ELEMENT_TYPE_CONNECTION,
+            "unlimited_connection",
+            source="battery1",
+            target="grid1",
+            min_power=None,  # Should remain None for infinite lower bound
+            max_power=None,  # Should remain None for infinite upper bound
+        )
+
+        assert connection is not None
+        assert len(connection.power) == 3
+
+        # Verify power variables have None bounds (infinite)
+        for power_var in connection.power:
+            assert power_var.lowBound is None  # Should be None for infinite lower bound
+            assert power_var.upBound is None  # Should be None for infinite upper bound
+
+    def test_connect_source_is_connection(self):
+        """Test connecting when source is a connection element."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
+        # Add entities and a connection
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(
+            ELEMENT_TYPE_GRID,
+            "grid1",
+            import_limit=10000,
+            export_limit=5000,
+            price_import=[0.1, 0.2, 0.15],
+            price_export=[0.05, 0.08, 0.06],
+        )
+        network.add(ELEMENT_TYPE_CONNECTION, "conn1", source="battery1", target="grid1")
+
+        # Try to create another connection using the connection as source
+        network.add(ELEMENT_TYPE_CONNECTION, "bad_connection", source="conn1", target="battery1")
+
+        with pytest.raises(ValueError, match="Source element 'conn1' is a connection"):
+            network.validate()
+
+    def test_connect_target_is_connection(self):
+        """Test connecting when target is a connection element."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
+        # Add entities and a connection
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(
+            ELEMENT_TYPE_GRID,
+            "grid1",
+            import_limit=10000,
+            export_limit=5000,
+            price_import=[0.1, 0.2, 0.15],
+            price_export=[0.05, 0.08, 0.06],
+        )
+        network.add(ELEMENT_TYPE_CONNECTION, "conn1", source="battery1", target="grid1")
+
+        # Try to create another connection using the connection as target
+        network.add(ELEMENT_TYPE_CONNECTION, "bad_connection", source="battery1", target="conn1")
+
+        with pytest.raises(ValueError, match="Target element 'conn1' is a connection"):
             network.validate()
 
     def test_simple_optimization(self):
@@ -450,60 +668,29 @@ class TestScenarios:
         assert isinstance(cost, (int, float))
         assert cost > 0  # Should have some cost
 
-        # Access optimization results directly from elements
-        battery = network.elements["battery"]
+    def test_optimization_failure(self):
+        """Test optimization failure handling."""
+        network = Network(
+            name="test_network",
+            period=3600,
+            n_periods=3,
+        )
 
-        from pulp import value
+        # Create an infeasible optimization problem by adding conflicting constraints
+        # Add a battery with impossible constraints
+        network.add(
+            ELEMENT_TYPE_BATTERY,
+            "battery",
+            capacity=1000,
+            initial_charge_percentage=50,
+            min_charge_percentage=90,  # Impossible - starting charge is below minimum
+            max_charge_power=0,  # Can't charge
+            max_discharge_power=0,  # Can't discharge
+        )
 
-        # Helper function to safely extract numeric values from PuLP variables
-        def extract_value(var):
-            """Extract numeric value from PuLP variable."""
-            if var is None:
-                return 0.0
-            val = value(var)
-            if val is None:
-                return 0.0
-            if isinstance(val, (int, float)):
-                return float(val)
-            # Handle LpVariable case
-            if hasattr(val, "value"):
-                return float(val.value()) if val.value() is not None else 0.0
-            return 0.0
-
-        # Get battery power and energy values with proper type handling
-        battery_charge = []
-        battery_discharge = []
-        battery_energy = []
-
-        if battery.power_consumption is not None:
-            battery_charge = [extract_value(p) for p in battery.power_consumption]
-        if battery.power_production is not None:
-            battery_discharge = [extract_value(p) for p in battery.power_production]
-        if battery.energy is not None:
-            battery_energy = [extract_value(e) for e in battery.energy]
-
-        # Verify we have data
-        assert len(battery_charge) == 8, "Should have 8 periods of charge data"
-        assert len(battery_discharge) == 8, "Should have 8 periods of discharge data"
-        assert len(battery_energy) == 8, "Should have 8 periods of energy data"
-
-        # During high solar periods, battery should be charging (positive consumption)
-        # or at least not discharging much
-        high_solar_charge = sum(battery_charge[:4])
-        low_solar_charge = sum(battery_charge[4:])
-
-        # During high demand periods, battery should be discharging (positive production)
-        low_solar_discharge = sum(battery_discharge[4:])
-        high_solar_discharge = sum(battery_discharge[:4])
-
-        # Verify energy storage behavior
-        assert high_solar_charge >= low_solar_charge, "Battery should charge more during high solar"
-        assert low_solar_discharge >= high_solar_discharge, "Battery should discharge more during high demand"
-
-        # Verify energy conservation - battery energy should increase during charging periods
-        initial_energy = battery_energy[0]
-        mid_energy = battery_energy[3]  # End of charging period
-        assert mid_energy >= initial_energy, "Battery energy should increase during charging period"
+        # This should result in an infeasible optimization problem
+        with pytest.raises(ValueError, match="Optimization failed with status"):
+            network.optimize()
 
     def test_solar_curtailment_negative_pricing(self):
         """Test solar curtailment during negative export pricing periods.

@@ -3,7 +3,10 @@
 import pytest
 from unittest.mock import MagicMock
 
-from custom_components.haeo.const import ELEMENT_TYPE_BATTERY, ELEMENT_TYPE_GRID
+from custom_components.haeo.const import (
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+)
 
 # Enable custom component for testing
 pytest_plugins = ["pytest_homeassistant_custom_component"]

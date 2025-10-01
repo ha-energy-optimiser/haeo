@@ -53,11 +53,7 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
         # Show form
-        data_schema = vol.Schema(
-            {
-                vol.Required(CONF_NAME): vol.All(str, validate_element_name),
-            }
-        )
+        data_schema = vol.Schema({vol.Required(CONF_NAME): vol.All(str, validate_element_name)})
 
         return self.async_show_form(
             step_id="user",

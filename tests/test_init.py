@@ -3,16 +3,23 @@
 import pytest
 from unittest.mock import patch
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.haeo import async_setup_entry, async_unload_entry
+from custom_components.haeo import async_setup_entry, async_unload_entry, async_reload_entry
 from custom_components.haeo.const import (
-    DOMAIN,
-    CONF_ELEMENTS,
+    CONF_CAPACITY,
+    CONF_CURRENT_CHARGE_SENSOR,
     CONF_ELEMENT_TYPE,
-    CONF_ELEMENT_CONFIG,
+    CONF_EXPORT_LIMIT,
+    CONF_IMPORT_LIMIT,
+    CONF_MAX_POWER,
+    CONF_PARTICIPANTS,
+    CONF_PRICE_EXPORT_SENSOR,
+    CONF_PRICE_IMPORT_SENSOR,
+    CONF_SOURCE,
+    CONF_TARGET,
+    DOMAIN,
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_GRID,
     ELEMENT_TYPE_CONNECTION,
@@ -25,35 +32,28 @@ def mock_config_entry():
     return MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_ELEMENTS: [
-                {
-                    CONF_NAME: "test_battery",
+            "integration_type": "hub",
+            "name": "Test Network",
+            CONF_PARTICIPANTS: {
+                "test_battery": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY,
-                    CONF_ELEMENT_CONFIG: {
-                        "capacity": 10000,
-                        "initial_charge_percentage": 50,
-                    },
+                    CONF_CAPACITY: 10000,
+                    CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
                 },
-                {
-                    CONF_NAME: "test_grid",
+                "test_grid": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
-                    CONF_ELEMENT_CONFIG: {
-                        "import_limit": 10000,
-                        "export_limit": 5000,
-                        "price_import": [0.1, 0.2, 0.15],
-                        "price_export": [0.05, 0.08, 0.06],
-                    },
+                    CONF_IMPORT_LIMIT: 10000,
+                    CONF_EXPORT_LIMIT: 5000,
+                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
+                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
                 },
-                {
-                    CONF_NAME: "test_load",
+                "test_connection": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION,
-                    CONF_ELEMENT_CONFIG: {
-                        "source": "test_battery",
-                        "target": "test_grid",
-                        "max_power": 5000,
-                    },
+                    CONF_SOURCE: "test_battery",
+                    CONF_TARGET: "test_grid",
+                    CONF_MAX_POWER: 5000,
                 },
-            ],
+            },
         },
         entry_id="test_entry_id",
         title="Test HAEO Integration",
@@ -96,3 +96,20 @@ async def test_setup_entry_failure(hass: HomeAssistant, mock_config_entry: Confi
     ):
         with pytest.raises(Exception):
             await async_setup_entry(hass, mock_config_entry)
+
+
+async def test_reload_entry(hass: HomeAssistant, mock_config_entry: ConfigEntry):
+    """Test reloading the integration."""
+    with (
+        patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator.async_config_entry_first_refresh"),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", return_value=True),
+    ):
+        # First set up the integration
+        await async_setup_entry(hass, mock_config_entry)
+
+        # Now test reloading
+        await async_reload_entry(hass, mock_config_entry)
+
+        # Verify the integration was reloaded (coordinator should be recreated)
+        assert mock_config_entry.runtime_data is not None

@@ -15,10 +15,13 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.haeo.const import (
     DOMAIN,
     ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_CONNECTION,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_LOAD_FIXED,
+    ELEMENT_TYPE_LOAD_FORECAST,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_NET,
+    ELEMENT_TYPES,
 )
 
 
@@ -61,7 +64,7 @@ def get_valid_test_data() -> Dict[str, Dict[str, Any]]:
     # Import from individual test files to avoid duplication
     from tests.flows.test_battery import BATTERY_VALID_DATA
     from tests.flows.test_grid import GRID_VALID_DATA
-    from tests.flows.test_load import LOAD_VALID_DATA
+    from tests.flows.test_load import LOAD_VALID_DATA, LOAD_VARIABLE_DATA
     from tests.flows.test_generator import GENERATOR_VALID_DATA
     from tests.flows.test_net import NET_VALID_DATA
     from tests.flows.test_connection import CONNECTION_VALID_DATA
@@ -70,9 +73,11 @@ def get_valid_test_data() -> Dict[str, Dict[str, Any]]:
         ELEMENT_TYPE_BATTERY: BATTERY_VALID_DATA,
         ELEMENT_TYPE_GRID: GRID_VALID_DATA,
         ELEMENT_TYPE_LOAD: LOAD_VALID_DATA,
+        ELEMENT_TYPE_LOAD_FIXED: LOAD_VALID_DATA,
+        ELEMENT_TYPE_LOAD_FORECAST: LOAD_VARIABLE_DATA,
         ELEMENT_TYPE_GENERATOR: GENERATOR_VALID_DATA,
         ELEMENT_TYPE_NET: NET_VALID_DATA,
-        "connection": CONNECTION_VALID_DATA,
+        ELEMENT_TYPE_CONNECTION: CONNECTION_VALID_DATA,
     }
 
 
@@ -90,22 +95,16 @@ def get_invalid_test_data() -> Dict[str, List[Tuple[Dict[str, Any], str]]]:
         ELEMENT_TYPE_BATTERY: BATTERY_INVALID_DATA,
         ELEMENT_TYPE_GRID: GRID_INVALID_DATA,
         ELEMENT_TYPE_LOAD: LOAD_INVALID_DATA,
+        ELEMENT_TYPE_LOAD_FIXED: LOAD_INVALID_DATA,
+        ELEMENT_TYPE_LOAD_FORECAST: LOAD_INVALID_DATA,
         ELEMENT_TYPE_GENERATOR: GENERATOR_INVALID_DATA,
         ELEMENT_TYPE_NET: NET_INVALID_DATA,
-        "connection": CONNECTION_INVALID_DATA,
+        ELEMENT_TYPE_CONNECTION: CONNECTION_INVALID_DATA,
     }
 
 
 # Pytest fixtures for data-driven testing
-@pytest.fixture(
-    params=[
-        ELEMENT_TYPE_BATTERY,
-        ELEMENT_TYPE_GRID,
-        ELEMENT_TYPE_LOAD,
-        ELEMENT_TYPE_GENERATOR,
-        ELEMENT_TYPE_NET,
-    ]
-)
+@pytest.fixture(params=ELEMENT_TYPES)
 def element_type(request):
     """Parametrized fixture for element types."""
     return request.param

@@ -22,6 +22,10 @@ class Connection:
         self.target = target
 
         # Initialize power variables for the connection
+        # For bidirectional connections, min_power can be negative
+        # Positive power = flow from source to target
+        # Negative power = flow from target to source
+        # None bounds mean no limit (infinite bounds)
         self.power = [
             LpVariable(name=f"{name}_power_{i}", lowBound=min_power, upBound=max_power) for i in range(n_periods)
         ]

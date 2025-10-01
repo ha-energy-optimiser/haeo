@@ -17,14 +17,12 @@ from .const import (
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_GRID,
     ELEMENT_TYPE_GENERATOR,
-    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_LOAD_FORECAST,
     CONF_SENSORS,
     CONF_SENSOR_ENTITY_ID,
     CONF_SENSOR_ATTRIBUTE,
     CONF_CURRENT_CHARGE_SENSOR,
     CONF_INITIAL_CHARGE_PERCENTAGE,
-    CONF_PRICE_IMPORT,
-    CONF_PRICE_EXPORT,
     CONF_PRICE_IMPORT_SENSOR,
     CONF_PRICE_EXPORT_SENSOR,
     CONF_FORECAST_SENSORS,
@@ -121,51 +119,45 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             element_params = element_config.copy()
             element_params.pop("type", None)  # Remove type key as it's not a constructor parameter
 
+            # Remove sensor configuration parameters as they're not model constructor parameters
+            sensor_config_keys = [
+                CONF_CURRENT_CHARGE_SENSOR,
+                CONF_PRICE_IMPORT_SENSOR,
+                CONF_PRICE_EXPORT_SENSOR,
+                CONF_FORECAST_SENSORS,
+                CONF_SENSORS,
+            ]
+            for key in sensor_config_keys:
+                element_params.pop(key, None)
+
             _LOGGER.debug("Adding element: %s (%s)", element_name, element_type)
 
             try:
                 # Handle battery entities - use current charge from sensor
                 if element_type == ELEMENT_TYPE_BATTERY:
-                    if CONF_CURRENT_CHARGE_SENSOR in element_params:
-                        current_charge_sensor = element_params[CONF_CURRENT_CHARGE_SENSOR]
+                    if CONF_CURRENT_CHARGE_SENSOR in element_config:  # Check original config, not filtered params
+                        current_charge_sensor = element_config[CONF_CURRENT_CHARGE_SENSOR]
                         current_charge = await self._get_sensor_value(current_charge_sensor)
                         if current_charge is not None:
                             # Update initial charge percentage from sensor
                             element_params[CONF_INITIAL_CHARGE_PERCENTAGE] = current_charge
-                        # Remove the sensor from params as it's not a Battery constructor parameter
-                        element_params.pop(CONF_CURRENT_CHARGE_SENSOR, None)
 
                 # Handle grid entities - need price arrays
                 if element_type == ELEMENT_TYPE_GRID:
-                    # Handle pricing from sensors or constants
+                    # Handle pricing from sensors
                     import_price_array = None
                     export_price_array = None
 
                     # Check for sensor-based pricing
-                    if CONF_PRICE_IMPORT_SENSOR in element_params:
-                        import_price_data = await self._get_sensor_forecast(element_params[CONF_PRICE_IMPORT_SENSOR])
+                    if CONF_PRICE_IMPORT_SENSOR in element_config:  # Check original config
+                        import_price_data = await self._get_sensor_forecast(element_config[CONF_PRICE_IMPORT_SENSOR])
                         if import_price_data:
                             import_price_array = import_price_data
-                        # Remove sensor from params as it's not a Grid constructor parameter
-                        element_params.pop(CONF_PRICE_IMPORT_SENSOR, None)
 
-                    if CONF_PRICE_EXPORT_SENSOR in element_params:
-                        export_price_data = await self._get_sensor_forecast(element_params[CONF_PRICE_EXPORT_SENSOR])
+                    if CONF_PRICE_EXPORT_SENSOR in element_config:  # Check original config
+                        export_price_data = await self._get_sensor_forecast(element_config[CONF_PRICE_EXPORT_SENSOR])
                         if export_price_data:
                             export_price_array = export_price_data
-                        # Remove sensor from params as it's not a Grid constructor parameter
-                        element_params.pop(CONF_PRICE_EXPORT_SENSOR, None)
-
-                    # Check for constant pricing
-                    if CONF_PRICE_IMPORT in element_params:
-                        constant_import = element_params.pop(CONF_PRICE_IMPORT)
-                        if import_price_array is None:  # Only use constant if no sensor data
-                            import_price_array = [constant_import] * DEFAULT_N_PERIODS
-
-                    if CONF_PRICE_EXPORT in element_params:
-                        constant_export = element_params.pop(CONF_PRICE_EXPORT)
-                        if export_price_array is None:  # Only use constant if no sensor data
-                            export_price_array = [constant_export] * DEFAULT_N_PERIODS
 
                     # Provide default price arrays if nothing is set
                     if import_price_array is None:
@@ -208,7 +200,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         element = self.network.elements[element_name]
                         element.price_consumption = price_export_data
 
-            elif element_type in [ELEMENT_TYPE_GENERATOR, ELEMENT_TYPE_LOAD]:
+            elif element_type in [ELEMENT_TYPE_GENERATOR, ELEMENT_TYPE_LOAD_FORECAST]:
                 # Update forecast data from sensors
                 forecast_sensors = element_config.get(CONF_FORECAST_SENSORS, [])
                 if forecast_sensors:

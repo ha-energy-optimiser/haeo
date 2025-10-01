@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -26,6 +27,7 @@ from ..const import (
     CONF_EFFICIENCY,
     CONF_CHARGE_COST,
     CONF_DISCHARGE_COST,
+    CONF_ELEMENT_TYPE,
 )
 from . import (
     validate_element_name,
@@ -38,12 +40,28 @@ from . import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_battery_schema() -> vol.Schema:
+def get_battery_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
     """Get the battery configuration schema."""
+    # Use current config values as defaults if provided, otherwise use standard defaults
+    defaults = {
+        CONF_NAME: None,
+        CONF_CAPACITY: None,
+        CONF_CURRENT_CHARGE_SENSOR: None,
+        CONF_MIN_CHARGE_PERCENTAGE: 10,
+        CONF_MAX_CHARGE_PERCENTAGE: 90,
+        CONF_MAX_CHARGE_POWER: None,
+        CONF_MAX_DISCHARGE_POWER: None,
+        CONF_EFFICIENCY: 0.99,
+        CONF_CHARGE_COST: None,
+        CONF_DISCHARGE_COST: None,
+    }
+    if current_config:
+        defaults.update(current_config)
+
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
-            vol.Required(CONF_CAPACITY): vol.All(
+            vol.Required(CONF_NAME, default=defaults[CONF_NAME]): vol.All(str, validate_element_name),
+            vol.Required(CONF_CAPACITY, default=defaults[CONF_CAPACITY]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -54,8 +72,16 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_positive_number,
             ),
-            vol.Required(CONF_CURRENT_CHARGE_SENSOR): EntitySelector(EntitySelectorConfig(domain="sensor")),
-            vol.Optional(CONF_MIN_CHARGE_PERCENTAGE, default=10): vol.All(
+            vol.Required(CONF_CURRENT_CHARGE_SENSOR, default=defaults[CONF_CURRENT_CHARGE_SENSOR]): EntitySelector(
+                EntitySelectorConfig(
+                    domain="sensor",
+                    device_class=[
+                        SensorDeviceClass.BATTERY,
+                        SensorDeviceClass.ENERGY_STORAGE,
+                    ],
+                )
+            ),
+            vol.Optional(CONF_MIN_CHARGE_PERCENTAGE, default=defaults[CONF_MIN_CHARGE_PERCENTAGE]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -67,7 +93,7 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_percentage,
             ),
-            vol.Optional(CONF_MAX_CHARGE_PERCENTAGE, default=90): vol.All(
+            vol.Optional(CONF_MAX_CHARGE_PERCENTAGE, default=defaults[CONF_MAX_CHARGE_PERCENTAGE]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -79,7 +105,7 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_percentage,
             ),
-            vol.Required(CONF_MAX_CHARGE_POWER): vol.All(
+            vol.Required(CONF_MAX_CHARGE_POWER, default=defaults[CONF_MAX_CHARGE_POWER]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -90,7 +116,7 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_positive_number,
             ),
-            vol.Required(CONF_MAX_DISCHARGE_POWER): vol.All(
+            vol.Required(CONF_MAX_DISCHARGE_POWER, default=defaults[CONF_MAX_DISCHARGE_POWER]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -101,7 +127,7 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_positive_number,
             ),
-            vol.Optional(CONF_EFFICIENCY, default=0.95): vol.All(
+            vol.Optional(CONF_EFFICIENCY, default=defaults[CONF_EFFICIENCY]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -112,7 +138,7 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_efficiency,
             ),
-            vol.Optional(CONF_CHARGE_COST, default=0): vol.All(
+            vol.Optional(CONF_CHARGE_COST, default=defaults[CONF_CHARGE_COST]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -123,7 +149,7 @@ def get_battery_schema() -> vol.Schema:
                 ),
                 validate_non_negative_number,
             ),
-            vol.Optional(CONF_DISCHARGE_COST, default=0): vol.All(
+            vol.Optional(CONF_DISCHARGE_COST, default=defaults[CONF_DISCHARGE_COST]): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
                         mode=NumberSelectorMode.BOX,
@@ -141,6 +167,6 @@ def get_battery_schema() -> vol.Schema:
 def create_battery_participant(config: dict[str, Any]) -> dict[str, Any]:
     """Create a battery participant configuration."""
     return {
-        "type": ELEMENT_TYPE_BATTERY,
+        CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY,
         **config,
     }

@@ -9,25 +9,21 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_NAME, UnitOfEnergy, UnitOfPower
+from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    CONF_ELEMENTS,
     DOMAIN,
-    ELEMENT_TYPE_BATTERY,
-    ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_CONNECTION,
-    ELEMENT_TYPE_LOAD,
-    ELEMENT_TYPE_GENERATOR,
-    ELEMENT_TYPE_NET,
     OPTIMIZATION_STATUS_SUCCESS,
+    OPTIMIZATION_STATUS_PENDING,
     UNIT_CURRENCY,
     ATTR_POWER,
     ATTR_ENERGY,
+    get_element_type_name,
 )
 from .coordinator import HaeoDataUpdateCoordinator
 
@@ -36,16 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def get_device_info_for_element(element_name: str, element_type: str, config_entry: ConfigEntry) -> DeviceInfo:
     """Get device info for a specific element."""
-    device_name_map = {
-        ELEMENT_TYPE_BATTERY: "Battery",
-        ELEMENT_TYPE_GRID: "Grid Connection",
-        ELEMENT_TYPE_LOAD: "Load",
-        ELEMENT_TYPE_GENERATOR: "Generator",
-        ELEMENT_TYPE_NET: "Network Node",
-        ELEMENT_TYPE_CONNECTION: "Connection",
-    }
-
-    device_name = device_name_map.get(element_type, "Device")
+    device_name = get_element_type_name(element_type)
     return DeviceInfo(
         identifiers={(DOMAIN, f"{config_entry.entry_id}_{element_name}")},
         name=f"{element_name}",
@@ -66,6 +53,36 @@ def get_device_info_for_network(config_entry: ConfigEntry) -> DeviceInfo:
     )
 
 
+async def async_register_devices(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Register devices with the device registry."""
+    device_registry_client = device_registry.async_get(hass)
+
+    # Register the main network device
+    device_registry_client.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, config_entry.entry_id)},
+        name="HAEO Energy Optimization Network",
+        manufacturer="HAEO",
+        model="Energy Optimization Network",
+        sw_version="1.0.0",
+    )
+
+    # Register devices for each participant element
+    participants = config_entry.data.get("participants", {})
+    for element_name, element_config in participants.items():
+        element_type = element_config.get("type", "")
+
+        device_name = get_element_type_name(element_type)
+        device_registry_client.async_get_or_create(
+            config_entry_id=config_entry.entry_id,
+            identifiers={(DOMAIN, f"{config_entry.entry_id}_{element_name}")},
+            name=element_name,
+            manufacturer="HAEO",
+            model=f"Energy Optimization {device_name}",
+            via_device=(DOMAIN, config_entry.entry_id),
+        )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -74,6 +91,13 @@ async def async_setup_entry(
     """Set up HAEO sensor platform."""
     coordinator: HaeoDataUpdateCoordinator = config_entry.runtime_data
 
+    # Register devices with the device registry only if coordinator is available
+    if coordinator:
+        try:
+            await async_register_devices(hass, config_entry)
+        except Exception as ex:
+            _LOGGER.warning("Failed to register devices: %s", ex)
+
     entities: list[SensorEntity] = []
 
     # Add optimization status and cost sensors (hub-level)
@@ -81,8 +105,8 @@ async def async_setup_entry(
     entities.append(HaeoOptimizationStatusSensor(coordinator, config_entry))
 
     # Add element-specific sensors based on available data
-    for element_config in config_entry.data[CONF_ELEMENTS]:
-        element_name = element_config[CONF_NAME]
+    participants = config_entry.data.get("participants", {})
+    for element_name, element_config in participants.items():
         element_type = element_config.get("type", "")
 
         # Create a helper function to check if we have optimization data for this entity
@@ -121,6 +145,8 @@ class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity)
         super().__init__(coordinator)
         self.config_entry = config_entry
         self.sensor_type = sensor_type
+        self.element_name = element_name
+        self.element_type = element_type
         self._attr_name = f"HAEO {name_suffix}"
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}"
 
@@ -129,6 +155,30 @@ class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity)
             self._attr_device_info = get_device_info_for_element(element_name, element_type, config_entry)
         else:
             self._attr_device_info = get_device_info_for_network(config_entry)
+
+    @property
+    def available(self) -> bool:
+        """Return if the sensor is available."""
+        # Check if coordinator is available
+        if not super().available:
+            return False
+
+        # For entity-specific sensors, check if we can get element data
+        if self.element_name and self.element_type:
+            try:
+                element_data = self.coordinator.get_element_data(self.element_name)
+                return element_data is not None
+            except Exception:
+                return False
+
+        # For hub-level sensors, check if coordinator has optimization results
+        if self.sensor_type in ["optimization_cost", "optimization_status"]:
+            return (
+                self.coordinator.optimization_result is not None
+                or self.coordinator.optimization_status != OPTIMIZATION_STATUS_PENDING
+            )
+
+        return True
 
 
 class HaeoOptimizationCostSensor(HaeoSensorBase):
@@ -226,30 +276,39 @@ class HaeoElementPowerSensor(HaeoSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return the current net power (positive = producing, negative = consuming)."""
-        element_data = self.coordinator.get_element_data(self.element_name)
-        if element_data and ATTR_POWER in element_data:
-            # Return the current period's value (first value)
-            power_data = element_data[ATTR_POWER]
-            return power_data[0] if power_data else None
+        try:
+            element_data = self.coordinator.get_element_data(self.element_name)
+            if element_data and ATTR_POWER in element_data:
+                # Return the current period's value (first value)
+                power_data = element_data[ATTR_POWER]
+                return power_data[0] if power_data else None
+        except Exception as ex:
+            _LOGGER.debug("Error getting element data for %s: %s", self.element_name, ex)
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
         attrs = {}
-        element_data = self.coordinator.get_element_data(self.element_name)
-        if element_data and ATTR_POWER in element_data:
-            power_data = element_data[ATTR_POWER]
-            timestamps = self.coordinator.get_future_timestamps()
+        try:
+            element_data = self.coordinator.get_element_data(self.element_name)
+            if element_data and ATTR_POWER in element_data:
+                power_data = element_data[ATTR_POWER]
 
-            # Add forecast data
-            attrs["forecast"] = power_data
+                # Add forecast data
+                attrs["forecast"] = power_data
 
-            # Add timestamped forecast
-            if len(timestamps) == len(power_data):
-                attrs["timestamped_forecast"] = [
-                    {"timestamp": ts, "value": value} for ts, value in zip(timestamps, power_data)
-                ]
+                # Add timestamped forecast (with error handling)
+                try:
+                    timestamps = self.coordinator.get_future_timestamps()
+                    if len(timestamps) == len(power_data):
+                        attrs["timestamped_forecast"] = [
+                            {"timestamp": ts, "value": value} for ts, value in zip(timestamps, power_data)
+                        ]
+                except Exception as ex:
+                    _LOGGER.debug("Error getting timestamps for %s: %s", self.element_name, ex)
+        except Exception as ex:
+            _LOGGER.debug("Error getting element attributes for %s: %s", self.element_name, ex)
         return attrs
 
 
@@ -275,28 +334,37 @@ class HaeoElementEnergySensor(HaeoSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return the current energy level."""
-        element_data = self.coordinator.get_element_data(self.element_name)
-        if element_data and ATTR_ENERGY in element_data:
-            # Return the current period's value (first value)
-            energy_data = element_data[ATTR_ENERGY]
-            return energy_data[0] if energy_data else None
+        try:
+            element_data = self.coordinator.get_element_data(self.element_name)
+            if element_data and ATTR_ENERGY in element_data:
+                # Return the current period's value (first value)
+                energy_data = element_data[ATTR_ENERGY]
+                return energy_data[0] if energy_data else None
+        except Exception as ex:
+            _LOGGER.debug("Error getting energy data for %s: %s", self.element_name, ex)
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
         attrs = {}
-        element_data = self.coordinator.get_element_data(self.element_name)
-        if element_data and ATTR_ENERGY in element_data:
-            energy_data = element_data[ATTR_ENERGY]
-            timestamps = self.coordinator.get_future_timestamps()
+        try:
+            element_data = self.coordinator.get_element_data(self.element_name)
+            if element_data and ATTR_ENERGY in element_data:
+                energy_data = element_data[ATTR_ENERGY]
 
-            # Add forecast data
-            attrs["forecast"] = energy_data
+                # Add forecast data
+                attrs["forecast"] = energy_data
 
-            # Add timestamped forecast
-            if len(timestamps) == len(energy_data):
-                attrs["timestamped_forecast"] = [
-                    {"timestamp": ts, "value": value} for ts, value in zip(timestamps, energy_data)
-                ]
+                # Add timestamped forecast (with error handling)
+                try:
+                    timestamps = self.coordinator.get_future_timestamps()
+                    if len(timestamps) == len(energy_data):
+                        attrs["timestamped_forecast"] = [
+                            {"timestamp": ts, "value": value} for ts, value in zip(timestamps, energy_data)
+                        ]
+                except Exception as ex:
+                    _LOGGER.debug("Error getting timestamps for %s: %s", self.element_name, ex)
+        except Exception as ex:
+            _LOGGER.debug("Error getting energy attributes for %s: %s", self.element_name, ex)
         return attrs

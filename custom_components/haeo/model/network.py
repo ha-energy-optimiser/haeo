@@ -6,7 +6,8 @@ from .element import Element
 from .connection import Connection
 from .battery import Battery
 from .generator import Generator
-from .load import Load
+from .load_constant import LoadConstant
+from .load_forecast import LoadForecast
 from .grid import Grid
 from .net import Net
 
@@ -35,7 +36,8 @@ class Network:
         self.elements[name] = {
             "battery": Battery,
             "generator": Generator,
-            "load": Load,
+            "load_fixed": LoadConstant,
+            "load_forecast": LoadForecast,
             "grid": Grid,
             "net": Net,
             "connection": Connection,

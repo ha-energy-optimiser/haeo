@@ -12,8 +12,6 @@ from custom_components.haeo.const import (
     ELEMENT_TYPE_GRID,
     CONF_IMPORT_LIMIT,
     CONF_EXPORT_LIMIT,
-    CONF_PRICE_IMPORT,
-    CONF_PRICE_EXPORT,
     CONF_PRICE_IMPORT_SENSOR,
     CONF_PRICE_EXPORT_SENSOR,
 )
@@ -24,8 +22,6 @@ GRID_VALID_DATA = {
     CONF_NAME: "Test Grid",
     CONF_IMPORT_LIMIT: 5000,
     CONF_EXPORT_LIMIT: 3000,
-    CONF_PRICE_IMPORT: 0.25,
-    CONF_PRICE_EXPORT: 0.15,
 }
 
 GRID_SENSOR_DATA = {
@@ -42,18 +38,6 @@ GRID_INVALID_DATA = [
 ]
 
 GRID_PARTICIPANT_SCENARIOS = [
-    # Constant pricing
-    (
-        {
-            CONF_NAME: "Constant Grid",
-            CONF_IMPORT_LIMIT: 5000,
-            CONF_EXPORT_LIMIT: 3000,
-            CONF_PRICE_IMPORT: 0.25,
-            CONF_PRICE_EXPORT: 0.15,
-        },
-        "constant",
-    ),
-    # Sensor-based pricing
     (
         {
             CONF_NAME: "Sensor Grid",
@@ -109,21 +93,15 @@ async def test_grid_schema_validation_errors(
         assert expected_error in str(e).lower()
 
 
-@pytest.mark.parametrize("grid_data,expected_type", GRID_PARTICIPANT_SCENARIOS)
+@pytest.mark.parametrize("grid_data", GRID_PARTICIPANT_SCENARIOS)
 async def test_grid_participant_creation(
     hass: HomeAssistant,
     grid_data: dict,
-    expected_type: str,
 ):
     """Test grid participant creation with various configurations."""
     participant = create_grid_participant(grid_data)
 
     assert participant["type"] == ELEMENT_TYPE_GRID
     assert participant[CONF_IMPORT_LIMIT] == grid_data[CONF_IMPORT_LIMIT]
-
-    if expected_type == "constant":
-        assert CONF_PRICE_IMPORT in participant
-        assert CONF_PRICE_EXPORT in participant
-    elif expected_type == "sensor":
-        assert CONF_PRICE_IMPORT_SENSOR in participant
-        assert CONF_PRICE_EXPORT_SENSOR in participant
+    assert CONF_PRICE_IMPORT_SENSOR in participant
+    assert CONF_PRICE_EXPORT_SENSOR in participant
