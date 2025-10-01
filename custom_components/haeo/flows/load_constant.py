@@ -32,10 +32,7 @@ def get_constant_load_schema(current_config: dict[str, Any] | None = None, **kwa
     return vol.Schema(
         {
             vol.Required(CONF_NAME, default=defaults[CONF_NAME]): validate_element_name,
-            vol.Required(CONF_POWER, default=defaults[CONF_POWER]): vol.All(
-                validate_power_value,
-                validate_positive_number,
-            ),
+            vol.Required(CONF_POWER, default=defaults[CONF_POWER]): validate_power_value,
         }
     )
 

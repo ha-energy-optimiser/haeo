@@ -7,14 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.const import CONF_NAME
-from homeassistant.helpers.selector import (
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
-    SelectSelector,
-    SelectSelectorConfig,
-    SelectSelectorMode,
-)
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
 
 from ..const import (
     CONF_SOURCE,

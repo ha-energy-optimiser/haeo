@@ -29,7 +29,7 @@ from . import (
     validate_energy_value,
     validate_energy_sensor,
     validate_power_value,
-    validate_price_sensors,
+    validate_cost_value,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,8 +65,8 @@ def get_battery_schema(current_config: dict[str, Any] | None = None, **kwargs) -
             vol.Required(CONF_MAX_CHARGE_POWER, default=defaults[CONF_MAX_CHARGE_POWER]): validate_power_value,
             vol.Required(CONF_MAX_DISCHARGE_POWER, default=defaults[CONF_MAX_DISCHARGE_POWER]): validate_power_value,
             vol.Optional(CONF_EFFICIENCY, default=defaults[CONF_EFFICIENCY]): validate_efficiency,
-            vol.Optional(CONF_CHARGE_COST, default=defaults[CONF_CHARGE_COST]): validate_price_sensors,
-            vol.Optional(CONF_DISCHARGE_COST, default=defaults[CONF_DISCHARGE_COST]): validate_price_sensors,
+            vol.Optional(CONF_CHARGE_COST, default=defaults[CONF_CHARGE_COST]): validate_cost_value,
+            vol.Optional(CONF_DISCHARGE_COST, default=defaults[CONF_DISCHARGE_COST]): validate_cost_value,
         }
     )
 

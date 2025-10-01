@@ -48,15 +48,14 @@ CONF_IMPORT_LIMIT = "import_limit"
 CONF_EXPORT_LIMIT = "export_limit"
 CONF_PRICE_IMPORT_SENSOR = "price_import_sensor"
 CONF_PRICE_EXPORT_SENSOR = "price_export_sensor"
-CONF_PRICE_IMPORT_FORECAST_SENSOR = "price_import_forecast_sensor"
-CONF_PRICE_EXPORT_FORECAST_SENSOR = "price_export_forecast_sensor"
+CONF_PRICE_IMPORT_FORECAST_SENSORS = "price_import_forecast_sensor"
+CONF_PRICE_EXPORT_FORECAST_SENSORS = "price_export_forecast_sensor"
 
 # Load configuration keys
 CONF_LOAD_TYPE = "load_type"
 CONF_POWER = "power"
 CONF_ENERGY = "energy"
 CONF_FORECAST = "forecast"
-CONF_FORECAST_SENSOR = "forecast_sensor"
 CONF_FORECAST_SENSORS = "forecast_sensors"
 
 # Load types
