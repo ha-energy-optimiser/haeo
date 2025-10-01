@@ -25,7 +25,7 @@ VALID_DATA = [
             CONF_SOURCE: "Battery1",
             CONF_TARGET: "Load1",
             CONF_MIN_POWER: 0.0,
-            CONF_MAX_POWER: 5000,
+            CONF_MAX_POWER: 5000.0,
         },
     },
 ]

@@ -45,6 +45,7 @@ validate_percentage = vol.All(
         )
     ),
 )
+
 validate_efficiency = vol.All(
     NumberSelector(
         NumberSelectorConfig(
@@ -58,6 +59,10 @@ validate_efficiency = vol.All(
     vol.Range(min=0, max=1, min_included=False, msg="Efficiency must be between 0 and 1"),
 )
 
+validate_price_value = vol.All(
+    vol.Coerce(float),
+    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="$/kWh")),
+)
 validate_price_sensors = EntitySelector(
     EntitySelectorConfig(
         domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]

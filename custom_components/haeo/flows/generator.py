@@ -16,7 +16,7 @@ from ..const import (
     CONF_FORECAST_SENSORS,
     CONF_ELEMENT_TYPE,
 )
-from . import validate_element_name, validate_power_sensor, validate_power_forecast_sensors, validate_cost_value
+from . import validate_element_name, validate_power_sensor, validate_power_forecast_sensors, validate_price_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,11 +25,11 @@ def get_generator_schema(current_config: dict[str, Any] | None = None, **kwargs)
     """Get the generator configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
-        CONF_NAME: None,
-        CONF_POWER_SENSOR: None,
-        CONF_FORECAST_SENSORS: [],
+        CONF_NAME: vol.UNDEFINED,
+        CONF_POWER_SENSOR: vol.UNDEFINED,
+        CONF_FORECAST_SENSORS: vol.UNDEFINED,
         CONF_CURTAILMENT: False,
-        CONF_PRICE_PRODUCTION: None,
+        CONF_PRICE_PRODUCTION: vol.UNDEFINED,
     }
     if current_config:
         defaults.update(current_config)
@@ -38,11 +38,11 @@ def get_generator_schema(current_config: dict[str, Any] | None = None, **kwargs)
         {
             vol.Required(CONF_NAME, default=defaults[CONF_NAME]): vol.All(str, validate_element_name),
             vol.Required(CONF_POWER_SENSOR, default=defaults[CONF_POWER_SENSOR]): validate_power_sensor,
-            vol.Optional(
+            vol.Required(
                 CONF_FORECAST_SENSORS, default=defaults[CONF_FORECAST_SENSORS]
             ): validate_power_forecast_sensors,
             vol.Required(CONF_CURTAILMENT, default=defaults[CONF_CURTAILMENT]): bool,
-            vol.Optional(CONF_PRICE_PRODUCTION, default=defaults[CONF_PRICE_PRODUCTION]): validate_cost_value,
+            vol.Optional(CONF_PRICE_PRODUCTION, default=defaults[CONF_PRICE_PRODUCTION]): validate_price_value,
         }
     )
 

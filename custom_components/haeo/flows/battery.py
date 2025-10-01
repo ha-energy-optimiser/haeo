@@ -29,7 +29,7 @@ from . import (
     validate_energy_value,
     validate_energy_sensor,
     validate_power_value,
-    validate_cost_value,
+    validate_price_value,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,16 +39,16 @@ def get_battery_schema(current_config: dict[str, Any] | None = None, **kwargs) -
     """Get the battery configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
-        CONF_NAME: None,
-        CONF_CAPACITY: None,
-        CONF_CURRENT_CHARGE_SENSOR: None,
+        CONF_NAME: vol.UNDEFINED,
+        CONF_CAPACITY: vol.UNDEFINED,
+        CONF_CURRENT_CHARGE_SENSOR: vol.UNDEFINED,
         CONF_MIN_CHARGE_PERCENTAGE: 10,
         CONF_MAX_CHARGE_PERCENTAGE: 90,
-        CONF_MAX_CHARGE_POWER: None,
-        CONF_MAX_DISCHARGE_POWER: None,
+        CONF_MAX_CHARGE_POWER: vol.UNDEFINED,
+        CONF_MAX_DISCHARGE_POWER: vol.UNDEFINED,
         CONF_EFFICIENCY: 0.99,
-        CONF_CHARGE_COST: None,
-        CONF_DISCHARGE_COST: None,
+        CONF_CHARGE_COST: vol.UNDEFINED,
+        CONF_DISCHARGE_COST: vol.UNDEFINED,
     }
     if current_config:
         defaults.update(current_config)
@@ -60,13 +60,13 @@ def get_battery_schema(current_config: dict[str, Any] | None = None, **kwargs) -
             vol.Required(
                 CONF_CURRENT_CHARGE_SENSOR, default=defaults[CONF_CURRENT_CHARGE_SENSOR]
             ): validate_energy_sensor,
-            vol.Optional(CONF_MIN_CHARGE_PERCENTAGE, default=defaults[CONF_MIN_CHARGE_PERCENTAGE]): validate_percentage,
-            vol.Optional(CONF_MAX_CHARGE_PERCENTAGE, default=defaults[CONF_MAX_CHARGE_PERCENTAGE]): validate_percentage,
+            vol.Required(CONF_MIN_CHARGE_PERCENTAGE, default=defaults[CONF_MIN_CHARGE_PERCENTAGE]): validate_percentage,
+            vol.Required(CONF_MAX_CHARGE_PERCENTAGE, default=defaults[CONF_MAX_CHARGE_PERCENTAGE]): validate_percentage,
             vol.Required(CONF_MAX_CHARGE_POWER, default=defaults[CONF_MAX_CHARGE_POWER]): validate_power_value,
             vol.Required(CONF_MAX_DISCHARGE_POWER, default=defaults[CONF_MAX_DISCHARGE_POWER]): validate_power_value,
-            vol.Optional(CONF_EFFICIENCY, default=defaults[CONF_EFFICIENCY]): validate_efficiency,
-            vol.Optional(CONF_CHARGE_COST, default=defaults[CONF_CHARGE_COST]): validate_cost_value,
-            vol.Optional(CONF_DISCHARGE_COST, default=defaults[CONF_DISCHARGE_COST]): validate_cost_value,
+            vol.Required(CONF_EFFICIENCY, default=defaults[CONF_EFFICIENCY]): validate_efficiency,
+            vol.Optional(CONF_CHARGE_COST, default=defaults[CONF_CHARGE_COST]): validate_price_value,
+            vol.Optional(CONF_DISCHARGE_COST, default=defaults[CONF_DISCHARGE_COST]): validate_price_value,
         }
     )
 

@@ -23,8 +23,8 @@ def get_constant_load_schema(current_config: dict[str, Any] | None = None, **kwa
     """Get the constant load configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
-        CONF_NAME: None,
-        CONF_POWER: None,
+        CONF_NAME: vol.UNDEFINED,
+        CONF_POWER: vol.UNDEFINED,
     }
     if current_config:
         defaults.update(current_config)

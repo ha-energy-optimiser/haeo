@@ -18,8 +18,8 @@ def get_forecast_load_schema(current_config: dict[str, Any] | None = None, **kwa
     """Get the forecast load configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
-        CONF_NAME: None,
-        CONF_FORECAST_SENSORS: None,
+        CONF_NAME: vol.UNDEFINED,
+        CONF_FORECAST_SENSORS: vol.UNDEFINED,
     }
     if current_config:
         defaults.update(current_config)

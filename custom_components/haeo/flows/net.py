@@ -18,7 +18,7 @@ def get_net_schema(current_config: dict[str, Any] | None = None, **kwargs) -> vo
     """Get the net configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
-        CONF_NAME: None,
+        CONF_NAME: vol.UNDEFINED,
     }
     if current_config:
         defaults.update(current_config)

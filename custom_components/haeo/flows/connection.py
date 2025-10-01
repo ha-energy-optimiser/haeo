@@ -26,11 +26,11 @@ def get_connection_schema(participants: dict[str, Any], current_config: dict[str
     """Get the connection configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
-        CONF_NAME: None,
-        CONF_SOURCE: None,
-        CONF_TARGET: None,
-        CONF_MIN_POWER: None,
-        CONF_MAX_POWER: None,
+        CONF_NAME: vol.UNDEFINED,
+        CONF_SOURCE: vol.UNDEFINED,
+        CONF_TARGET: vol.UNDEFINED,
+        CONF_MIN_POWER: vol.UNDEFINED,
+        CONF_MAX_POWER: vol.UNDEFINED,
     }
     if current_config:
         defaults.update(current_config)
