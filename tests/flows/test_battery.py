@@ -1,6 +1,7 @@
 """Test battery config flow."""
 
 from custom_components.haeo.const import (
+    CONF_NAME,
     CONF_CAPACITY,
     CONF_CURRENT_CHARGE_SENSOR,
     CONF_MIN_CHARGE_PERCENTAGE,
@@ -17,6 +18,7 @@ VALID_DATA = [
     {
         "description": "Basic battery configuration",
         "config": {
+            CONF_NAME: "Test Battery",
             CONF_CAPACITY: 10000,
             CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
             CONF_MAX_CHARGE_POWER: 5000,
@@ -28,6 +30,7 @@ VALID_DATA = [
     {
         "description": "Advanced battery configuration with efficiency and limits",
         "config": {
+            CONF_NAME: "Advanced Battery",
             CONF_CAPACITY: 10000,
             CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
             CONF_MIN_CHARGE_PERCENTAGE: 10,
@@ -45,6 +48,7 @@ INVALID_DATA = [
     {
         "description": "Empty name should fail validation",
         "config": {
+            CONF_NAME: "",
             CONF_CAPACITY: 5000,
             CONF_CURRENT_CHARGE_SENSOR: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,
@@ -57,6 +61,7 @@ INVALID_DATA = [
     {
         "description": "Negative capacity should fail validation",
         "config": {
+            CONF_NAME: "Test Battery",
             CONF_CAPACITY: -1000,
             CONF_CURRENT_CHARGE_SENSOR: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,

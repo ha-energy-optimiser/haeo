@@ -14,17 +14,17 @@ VALID_DATA = [
         "description": "Basic connection configuration",
         "config": {
             CONF_NAME: "Battery to Grid",
-            CONF_SOURCE: "battery_1",
-            CONF_TARGET: "grid_1",
+            CONF_SOURCE: "Battery1",
+            CONF_TARGET: "Grid1",
         },
     },
     {
         "description": "Connection with power limits",
         "config": {
-            CONF_NAME: "Solar to Load",
-            CONF_SOURCE: "solar_1",
-            CONF_TARGET: "house_load",
-            CONF_MIN_POWER: 0,
+            CONF_NAME: "Battery to Load",
+            CONF_SOURCE: "Battery1",
+            CONF_TARGET: "Load1",
+            CONF_MIN_POWER: 0.0,
             CONF_MAX_POWER: 5000,
         },
     },
@@ -33,12 +33,12 @@ VALID_DATA = [
 INVALID_DATA = [
     {
         "description": "Empty source should fail validation",
-        "config": {CONF_NAME: "Test Connection", CONF_SOURCE: "", CONF_TARGET: "grid_1"},
+        "config": {CONF_NAME: "Test Connection", CONF_SOURCE: "", CONF_TARGET: "Grid1"},
         "error": "value must be one of",
     },
     {
         "description": "Empty target should fail validation",
-        "config": {CONF_NAME: "Test Connection", CONF_SOURCE: "battery_1", CONF_TARGET: ""},
+        "config": {CONF_NAME: "Test Connection", CONF_SOURCE: "Battery1", CONF_TARGET: ""},
         "error": "value must be one of",
     },
 ]

@@ -4,6 +4,14 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.components.sensor.const import SensorDeviceClass
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
 import voluptuous as vol
 
 from ..const import (
@@ -20,14 +28,64 @@ _LOGGER = logging.getLogger(__name__)
 
 # Optimized validators using voluptuous built-ins
 validate_element_name = vol.All(str, vol.Strip, vol.Length(min=1, msg="Name cannot be empty"))
+
 validate_positive_number = vol.All(
     vol.Coerce(float), vol.Range(min=0, min_included=False, msg="Value must be positive")
 )
-validate_percentage = vol.All(vol.Coerce(float), vol.Range(min=0, max=100, msg="Value must be between 0 and 100"))
-validate_efficiency = vol.All(
-    vol.Coerce(float), vol.Range(min=0, max=1, min_included=False, msg="Efficiency must be between 0 and 1")
+validate_percentage = vol.All(
+    vol.Coerce(float),
+    vol.Range(min=0, max=100, msg="Value must be between 0 and 100"),
+    NumberSelector(
+        NumberSelectorConfig(
+            mode=NumberSelectorMode.BOX,
+            min=0,
+            max=100,
+            step=1,
+            unit_of_measurement="%",
+        )
+    ),
 )
-validate_non_negative_number = vol.All(vol.Coerce(float), vol.Range(min=0, msg="Value must be non-negative"))
+validate_efficiency = vol.All(
+    NumberSelector(
+        NumberSelectorConfig(
+            mode=NumberSelectorMode.BOX,
+            min=0.01,
+            max=1.0,
+            step=0.01,
+        )
+    ),
+    vol.Coerce(float),
+    vol.Range(min=0, max=1, min_included=False, msg="Efficiency must be between 0 and 1"),
+)
+
+validate_price_sensors = EntitySelector(
+    EntitySelectorConfig(
+        domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]
+    )
+)
+
+validate_power_value = vol.All(
+    validate_positive_number,
+    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="W")),
+)
+validate_power_flow_value = vol.All(
+    vol.Coerce(float),
+    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="W")),
+)
+validate_power_sensor = EntitySelector(EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.POWER]))
+validate_power_forecast_sensors = EntitySelector(
+    EntitySelectorConfig(
+        domain="sensor", multiple=True, device_class=[SensorDeviceClass.POWER, SensorDeviceClass.ENERGY]
+    )
+)
+
+validate_energy_value = vol.All(
+    validate_positive_number,
+    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="Wh")),
+)
+validate_energy_sensor = EntitySelector(
+    EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.BATTERY, SensorDeviceClass.ENERGY_STORAGE])
+)
 
 
 def _get_schemas():

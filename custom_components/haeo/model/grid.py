@@ -12,10 +12,10 @@ class Grid(Element):
         name: str,
         period: int,
         n_periods: int,
-        import_limit: float,
-        export_limit: float,
-        price_import: Sequence[float] | None,
-        price_export: Sequence[float] | None,
+        import_limit: float | None = None,
+        export_limit: float | None = None,
+        price_import: Sequence[float] | None = None,
+        price_export: Sequence[float] | None = None,
     ):
         # Validate that the forecasts match the number of periods
         if price_import is not None and len(price_import) != n_periods:

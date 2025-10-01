@@ -1,29 +1,40 @@
 """Test data and validation for generator flow configuration."""
 
-from custom_components.haeo.const import CONF_MAX_POWER, CONF_CURTAILMENT, CONF_FORECAST_SENSORS
+from custom_components.haeo.const import (
+    CONF_NAME,
+    CONF_POWER_SENSOR,
+    CONF_CURTAILMENT,
+    CONF_FORECAST_SENSORS,
+    CONF_PRICE_PRODUCTION,
+)
 
 # Test data for generator flow
 VALID_DATA = [
     {
         "description": "Basic generator configuration",
         "config": {
-            CONF_MAX_POWER: 3000,
+            CONF_NAME: "Test Generator",
+            CONF_POWER_SENSOR: "sensor.generator_power",
             CONF_CURTAILMENT: False,
         },
     },
     {
         "description": "Curtailable generator configuration",
         "config": {
-            CONF_MAX_POWER: 5000,
+            CONF_NAME: "Curtailable Generator",
+            CONF_POWER_SENSOR: "sensor.generator_power",
             CONF_CURTAILMENT: True,
+            CONF_PRICE_PRODUCTION: 0.03,
         },
     },
     {
         "description": "Generator with forecast sensors",
         "config": {
-            CONF_MAX_POWER: 4000,
+            CONF_NAME: "Solar Generator",
+            CONF_POWER_SENSOR: "sensor.generator_power",
             CONF_CURTAILMENT: True,
             CONF_FORECAST_SENSORS: ["sensor.solar_forecast"],
+            CONF_PRICE_PRODUCTION: 0.04,
         },
     },
 ]
@@ -31,12 +42,12 @@ VALID_DATA = [
 INVALID_DATA = [
     {
         "description": "Empty name should fail validation",
-        "config": {CONF_MAX_POWER: 3000},
+        "config": {CONF_NAME: "", CONF_POWER_SENSOR: "sensor.test"},
         "error": "cannot be empty",
     },
     {
-        "description": "Negative max power should fail validation",
-        "config": {CONF_MAX_POWER: -1000},
-        "error": "too small",
+        "description": "Invalid curtailment value should fail validation",
+        "config": {CONF_NAME: "Test", CONF_POWER_SENSOR: "sensor.test", CONF_CURTAILMENT: "invalid"},
+        "error": "expected bool",
     },
 ]

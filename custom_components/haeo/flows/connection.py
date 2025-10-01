@@ -24,9 +24,7 @@ from ..const import (
     ELEMENT_TYPE_CONNECTION,
     CONF_ELEMENT_TYPE,
 )
-from . import (
-    validate_element_name,
-)
+from . import validate_element_name, validate_power_flow_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,26 +59,8 @@ def get_connection_schema(participants: dict[str, Any], current_config: dict[str
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
-            vol.Optional(CONF_MIN_POWER, default=defaults[CONF_MIN_POWER]): vol.All(
-                NumberSelector(
-                    NumberSelectorConfig(
-                        mode=NumberSelectorMode.BOX,
-                        step=1,
-                        unit_of_measurement="W",
-                    )
-                ),
-                vol.Coerce(float),  # Allow any numeric value for bidirectional connections
-            ),
-            vol.Optional(CONF_MAX_POWER, default=defaults[CONF_MAX_POWER]): vol.All(
-                NumberSelector(
-                    NumberSelectorConfig(
-                        mode=NumberSelectorMode.BOX,
-                        step=1,
-                        unit_of_measurement="W",
-                    )
-                ),
-                vol.Coerce(float),  # Allow any numeric value but validate in custom function
-            ),
+            vol.Optional(CONF_MIN_POWER, default=defaults[CONF_MIN_POWER]): validate_power_flow_value,
+            vol.Optional(CONF_MAX_POWER, default=defaults[CONF_MAX_POWER]): validate_power_flow_value,
         }
     )
 

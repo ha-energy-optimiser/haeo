@@ -1,6 +1,7 @@
 """Test data and validation for grid flow configuration."""
 
 from custom_components.haeo.const import (
+    CONF_NAME,
     CONF_IMPORT_LIMIT,
     CONF_EXPORT_LIMIT,
     CONF_PRICE_IMPORT_SENSOR,
@@ -12,6 +13,7 @@ VALID_DATA = [
     {
         "description": "Basic grid configuration",
         "config": {
+            CONF_NAME: "Test Grid",
             CONF_IMPORT_LIMIT: 5000,
             CONF_EXPORT_LIMIT: 3000,
         },
@@ -19,10 +21,11 @@ VALID_DATA = [
     {
         "description": "Grid with sensor-based pricing",
         "config": {
+            CONF_NAME: "Smart Grid",
             CONF_IMPORT_LIMIT: 8000,
             CONF_EXPORT_LIMIT: 5000,
-            CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-            CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+            CONF_PRICE_IMPORT_SENSOR: "sensor.smart_grid_import_price",
+            CONF_PRICE_EXPORT_SENSOR: "sensor.smart_grid_export_price",
         },
     },
 ]
@@ -30,12 +33,12 @@ VALID_DATA = [
 INVALID_DATA = [
     {
         "description": "Empty name should fail validation",
-        "config": {CONF_IMPORT_LIMIT: 5000},
+        "config": {CONF_NAME: "", CONF_IMPORT_LIMIT: 5000},
         "error": "cannot be empty",
     },
     {
         "description": "Negative import limit should fail validation",
-        "config": {CONF_IMPORT_LIMIT: -1000},
+        "config": {CONF_NAME: "Test Grid", CONF_IMPORT_LIMIT: -1000},
         "error": "too small",
     },
 ]

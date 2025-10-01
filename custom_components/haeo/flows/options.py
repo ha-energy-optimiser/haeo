@@ -83,7 +83,7 @@ class HubOptionsFlow(config_entries.OptionsFlow):
                         return await self._add_participant(name, participant)
 
         # Get participants for schema if needed
-        participants = list(self.config_entry.data.get("participants", {}).values())
+        participants = self.config_entry.data.get("participants", {})
 
         return self.async_show_form(
             step_id=f"configure_{element_type}",

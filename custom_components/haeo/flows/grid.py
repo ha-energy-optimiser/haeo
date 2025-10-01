@@ -6,15 +6,8 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import CONF_NAME
-from homeassistant.helpers.selector import (
-    EntitySelector,
-    EntitySelectorConfig,
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
-)
+
 
 from ..const import (
     CONF_PRICE_EXPORT_FORECAST_SENSOR,
@@ -26,15 +19,13 @@ from ..const import (
     CONF_PRICE_EXPORT_SENSOR,
     CONF_ELEMENT_TYPE,
 )
-from . import (
-    validate_element_name,
-    validate_positive_number,
-)
+from . import validate_element_name, validate_price_sensors, validate_power_value
+
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_grid_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
+def get_grid_schema(current_config: dict[str, Any] | None = None, **kwargs) -> vol.Schema:
     """Get the grid configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
@@ -51,69 +42,17 @@ def get_grid_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
 
     return vol.Schema(
         {
-            vol.Required(CONF_NAME, default=defaults[CONF_NAME]): vol.All(str, validate_element_name),
-            vol.Optional(CONF_IMPORT_LIMIT, default=defaults[CONF_IMPORT_LIMIT]): vol.All(
-                NumberSelector(
-                    NumberSelectorConfig(
-                        mode=NumberSelectorMode.BOX,
-                        min=1,
-                        step=1,
-                        unit_of_measurement="W",
-                    )
-                ),
-                validate_positive_number,
-            ),
-            vol.Optional(CONF_EXPORT_LIMIT, default=defaults[CONF_EXPORT_LIMIT]): vol.All(
-                NumberSelector(
-                    NumberSelectorConfig(
-                        mode=NumberSelectorMode.BOX,
-                        min=1,
-                        step=1,
-                        unit_of_measurement="W",
-                    )
-                ),
-                validate_positive_number,
-            ),
-            vol.Required(CONF_PRICE_IMPORT_SENSOR, default=defaults[CONF_PRICE_IMPORT_SENSOR]): EntitySelector(
-                EntitySelectorConfig(
-                    domain="sensor",
-                    device_class=[
-                        SensorDeviceClass.MONETARY,
-                        SensorDeviceClass.ENERGY,
-                    ],
-                )
-            ),
-            vol.Required(CONF_PRICE_EXPORT_SENSOR, default=defaults[CONF_PRICE_EXPORT_SENSOR]): EntitySelector(
-                EntitySelectorConfig(
-                    domain="sensor",
-                    device_class=[
-                        SensorDeviceClass.MONETARY,
-                        SensorDeviceClass.ENERGY,
-                    ],
-                )
-            ),
-            vol.Required(
+            vol.Required(CONF_NAME, default=defaults[CONF_NAME]): validate_element_name,
+            vol.Optional(CONF_IMPORT_LIMIT, default=defaults[CONF_IMPORT_LIMIT]): validate_power_value,
+            vol.Optional(CONF_EXPORT_LIMIT, default=defaults[CONF_EXPORT_LIMIT]): validate_power_value,
+            vol.Optional(CONF_PRICE_IMPORT_SENSOR, default=defaults[CONF_PRICE_IMPORT_SENSOR]): validate_price_sensors,
+            vol.Optional(CONF_PRICE_EXPORT_SENSOR, default=defaults[CONF_PRICE_EXPORT_SENSOR]): validate_price_sensors,
+            vol.Optional(
                 CONF_PRICE_IMPORT_FORECAST_SENSOR, default=defaults[CONF_PRICE_IMPORT_FORECAST_SENSOR]
-            ): EntitySelector(
-                EntitySelectorConfig(
-                    domain="sensor",
-                    device_class=[
-                        SensorDeviceClass.MONETARY,
-                        SensorDeviceClass.ENERGY,
-                    ],
-                )
-            ),
-            vol.Required(
+            ): validate_price_sensors,
+            vol.Optional(
                 CONF_PRICE_EXPORT_FORECAST_SENSOR, default=defaults[CONF_PRICE_EXPORT_FORECAST_SENSOR]
-            ): EntitySelector(
-                EntitySelectorConfig(
-                    domain="sensor",
-                    device_class=[
-                        SensorDeviceClass.MONETARY,
-                        SensorDeviceClass.ENERGY,
-                    ],
-                )
-            ),
+            ): validate_price_sensors,
         }
     )
 

@@ -7,24 +7,14 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.const import CONF_NAME
-from homeassistant.helpers.selector import (
-    EntitySelector,
-    EntitySelectorConfig,
-)
 
-from ..const import (
-    ELEMENT_TYPE_LOAD_FORECAST,
-    CONF_FORECAST_SENSORS,
-    CONF_ELEMENT_TYPE,
-)
-from . import (
-    validate_element_name,
-)
+from ..const import ELEMENT_TYPE_LOAD_FORECAST, CONF_FORECAST_SENSORS, CONF_ELEMENT_TYPE
+from . import validate_element_name, validate_power_forecast_sensors
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_forecast_load_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
+def get_forecast_load_schema(current_config: dict[str, Any] | None = None, **kwargs) -> vol.Schema:
     """Get the forecast load configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
@@ -36,10 +26,10 @@ def get_forecast_load_schema(current_config: dict[str, Any] | None = None) -> vo
 
     return vol.Schema(
         {
-            vol.Required(CONF_NAME, default=defaults[CONF_NAME]): vol.All(str, validate_element_name),
-            vol.Required(CONF_FORECAST_SENSORS, default=defaults[CONF_FORECAST_SENSORS]): EntitySelector(
-                EntitySelectorConfig(domain="sensor", multiple=True)
-            ),
+            vol.Required(CONF_NAME, default=defaults[CONF_NAME]): validate_element_name,
+            vol.Required(
+                CONF_FORECAST_SENSORS, default=defaults[CONF_FORECAST_SENSORS]
+            ): validate_power_forecast_sensors,
         }
     )
 

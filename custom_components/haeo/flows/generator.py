@@ -24,20 +24,18 @@ from ..const import (
     CONF_FORECAST_SENSORS,
     CONF_ELEMENT_TYPE,
 )
-from . import (
-    validate_element_name,
-)
+from . import validate_element_name, validate_power_sensor, validate_power_forecast_sensors, validate_price_sensors
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_generator_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
+def get_generator_schema(current_config: dict[str, Any] | None = None, **kwargs) -> vol.Schema:
     """Get the generator configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
         CONF_NAME: None,
         CONF_POWER_SENSOR: None,
-        CONF_FORECAST_SENSORS: None,
+        CONF_FORECAST_SENSORS: [],
         CONF_CURTAILMENT: False,
         CONF_PRICE_PRODUCTION: None,
     }
@@ -47,24 +45,12 @@ def get_generator_schema(current_config: dict[str, Any] | None = None) -> vol.Sc
     return vol.Schema(
         {
             vol.Required(CONF_NAME, default=defaults[CONF_NAME]): vol.All(str, validate_element_name),
-            vol.Required(CONF_POWER_SENSOR, default=defaults[CONF_POWER_SENSOR]): EntitySelector(
-                EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.POWER])
-            ),
-            vol.Optional(CONF_FORECAST_SENSORS, default=defaults[CONF_FORECAST_SENSORS]): EntitySelector(
-                EntitySelectorConfig(
-                    domain="sensor", multiple=True, device_class=[SensorDeviceClass.POWER, SensorDeviceClass.ENERGY]
-                )
-            ),
+            vol.Required(CONF_POWER_SENSOR, default=defaults[CONF_POWER_SENSOR]): validate_power_sensor,
+            vol.Optional(
+                CONF_FORECAST_SENSORS, default=defaults[CONF_FORECAST_SENSORS]
+            ): validate_power_forecast_sensors,
             vol.Required(CONF_CURTAILMENT, default=defaults[CONF_CURTAILMENT]): bool,
-            vol.Optional(CONF_PRICE_PRODUCTION, default=defaults[CONF_PRICE_PRODUCTION]): vol.All(
-                NumberSelector(
-                    NumberSelectorConfig(
-                        mode=NumberSelectorMode.BOX,
-                        step=1,
-                        unit_of_measurement="$/kWh",
-                    )
-                ),
-            ),
+            vol.Optional(CONF_PRICE_PRODUCTION, default=defaults[CONF_PRICE_PRODUCTION]): validate_price_sensors,
         }
     )
 

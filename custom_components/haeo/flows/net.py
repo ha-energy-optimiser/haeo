@@ -14,7 +14,7 @@ from . import validate_element_name
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_net_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
+def get_net_schema(current_config: dict[str, Any] | None = None, **kwargs) -> vol.Schema:
     """Get the net configuration schema."""
     # Use current config values as defaults if provided, otherwise use standard defaults
     defaults = {
@@ -23,7 +23,7 @@ def get_net_schema(current_config: dict[str, Any] | None = None) -> vol.Schema:
     if current_config:
         defaults.update(current_config)
 
-    return vol.Schema({vol.Required(CONF_NAME, default=defaults[CONF_NAME]): vol.All(str, validate_element_name)})
+    return vol.Schema({vol.Required(CONF_NAME, default=defaults[CONF_NAME]): validate_element_name})
 
 
 def create_net_participant(config: dict[str, Any]) -> dict[str, Any]:

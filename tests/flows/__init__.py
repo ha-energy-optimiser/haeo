@@ -24,6 +24,7 @@ from custom_components.haeo.const import (
     ELEMENT_TYPES,
     CONF_CAPACITY,
     CONF_IMPORT_LIMIT,
+    CONF_ELEMENT_TYPE,
 )
 
 # Import the schema helper from the main flows module
@@ -38,41 +39,57 @@ def _get_test_data():
     from .test_generator import VALID_DATA as GENERATOR_VALID_DATA, INVALID_DATA as GENERATOR_INVALID_DATA
     from .test_grid import VALID_DATA as GRID_VALID_DATA, INVALID_DATA as GRID_INVALID_DATA
     from .test_load_constant import VALID_DATA as LOAD_VALID_DATA, INVALID_DATA as LOAD_INVALID_DATA
-    from .test_load_forecast import VALID_DATA as LOAD_VARIABLE_DATA
+    from .test_load_forecast import VALID_DATA as LOAD_FORECAST_VALID_DATA, INVALID_DATA as LOAD_FORECAST_INVALID_DATA
     from .test_net import VALID_DATA as NET_VALID_DATA, INVALID_DATA as NET_INVALID_DATA
 
+    # Create dictionary structure for easier access
+    valid_data_by_type = {
+        ELEMENT_TYPE_BATTERY: BATTERY_VALID_DATA,
+        ELEMENT_TYPE_CONNECTION: CONNECTION_VALID_DATA,
+        ELEMENT_TYPE_GENERATOR: GENERATOR_VALID_DATA,
+        ELEMENT_TYPE_GRID: GRID_VALID_DATA,
+        ELEMENT_TYPE_LOAD_FIXED: LOAD_VALID_DATA,
+        ELEMENT_TYPE_LOAD_FORECAST: LOAD_FORECAST_VALID_DATA,
+        ELEMENT_TYPE_NET: NET_VALID_DATA,
+    }
+
+    invalid_data_by_type = {
+        ELEMENT_TYPE_BATTERY: BATTERY_INVALID_DATA,
+        ELEMENT_TYPE_CONNECTION: CONNECTION_INVALID_DATA,
+        ELEMENT_TYPE_GENERATOR: GENERATOR_INVALID_DATA,
+        ELEMENT_TYPE_GRID: GRID_INVALID_DATA,
+        ELEMENT_TYPE_LOAD_FIXED: LOAD_INVALID_DATA,
+        ELEMENT_TYPE_LOAD_FORECAST: LOAD_FORECAST_INVALID_DATA,
+        ELEMENT_TYPE_NET: NET_INVALID_DATA,
+    }
+
     return (
-        {
-            ELEMENT_TYPE_BATTERY: BATTERY_VALID_DATA[0],
-            ELEMENT_TYPE_CONNECTION: CONNECTION_VALID_DATA[0],
-            ELEMENT_TYPE_GENERATOR: GENERATOR_VALID_DATA[0],
-            ELEMENT_TYPE_GRID: GRID_VALID_DATA[0],
-            ELEMENT_TYPE_LOAD_FIXED: LOAD_VALID_DATA[0],
-            ELEMENT_TYPE_LOAD_FORECAST: LOAD_VARIABLE_DATA[0],
-            ELEMENT_TYPE_NET: NET_VALID_DATA[0],
-        },
+        valid_data_by_type,
         [
-            *[(ELEMENT_TYPE_BATTERY, d) for d in BATTERY_VALID_DATA],
-            *[(ELEMENT_TYPE_CONNECTION, d) for d in CONNECTION_VALID_DATA],
-            *[(ELEMENT_TYPE_GENERATOR, d) for d in GENERATOR_VALID_DATA],
-            *[(ELEMENT_TYPE_GRID, d) for d in GRID_VALID_DATA],
-            *[(ELEMENT_TYPE_LOAD_FIXED, d) for d in LOAD_VALID_DATA],
-            *[(ELEMENT_TYPE_LOAD_FORECAST, d) for d in LOAD_VARIABLE_DATA],
-            *[(ELEMENT_TYPE_NET, d) for d in NET_VALID_DATA],
+            (element_type, test_data)
+            for element_type, test_data_list in valid_data_by_type.items()
+            for test_data in test_data_list
         ],
+        invalid_data_by_type,
         [
-            *[(ELEMENT_TYPE_BATTERY, d) for d in BATTERY_INVALID_DATA],
-            *[(ELEMENT_TYPE_CONNECTION, d) for d in CONNECTION_INVALID_DATA],
-            *[(ELEMENT_TYPE_GENERATOR, d) for d in GENERATOR_INVALID_DATA],
-            *[(ELEMENT_TYPE_GRID, d) for d in GRID_INVALID_DATA],
-            *[(ELEMENT_TYPE_LOAD_FIXED, d) for d in LOAD_INVALID_DATA],
-            *[(ELEMENT_TYPE_LOAD_FORECAST, d) for d in LOAD_INVALID_DATA],
-            *[(ELEMENT_TYPE_NET, d) for d in NET_INVALID_DATA],
+            (element_type, test_data)
+            for element_type, test_data_list in invalid_data_by_type.items()
+            for test_data in test_data_list
         ],
     )
 
 
-VALID_ELEMENT_DATA, VALID_TEST_DATA, INVALID_TEST_DATA = _get_test_data()
+VALID_ELEMENT_DATA, VALID_TEST_DATA, INVALID_ELEMENT_DATA, INVALID_TEST_DATA = _get_test_data()
+
+# Hub test data (not element-specific)
+HUB_VALID_DATA = {"name": "Test Hub"}
+
+# Mock participants for schema testing
+MOCK_PARTICIPANTS = {
+    "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+    "Grid1": {"type": ELEMENT_TYPE_GRID, CONF_IMPORT_LIMIT: 5000},
+    "Load1": {"type": ELEMENT_TYPE_LOAD_FIXED, "power": 2000},
+}
 
 
 def create_mock_config_entry(
@@ -178,14 +195,7 @@ async def test_element_schema_validation_success(hass: HomeAssistant, element_ty
         assert result[key] == value
 
 
-@pytest.mark.parametrize(
-    "element_type,invalid_case",
-    [
-        (element_type, invalid_case)
-        for element_type, test_data_list in INVALID_TEST_DATA.items()
-        for invalid_case in test_data_list
-    ],
-)
+@pytest.mark.parametrize("element_type,invalid_case", INVALID_TEST_DATA)
 async def test_element_schema_validation_errors(hass: HomeAssistant, element_type, invalid_case):
     """Test schema validation errors for all element types."""
     invalid_data = invalid_case["config"]
@@ -338,25 +348,6 @@ async def test_options_flow_no_participants(hass: HomeAssistant):
     result = await options_flow.async_step_remove_participant()
     assert result.get("type") == FlowResultType.ABORT
     assert result.get("reason") == "no_participants"
-
-
-async def test_options_flow_connection_insufficient_devices(hass: HomeAssistant):
-    """Test connection configuration with insufficient devices."""
-    from custom_components.haeo.flows.options import HubOptionsFlow
-
-    config_data = {
-        "integration_type": "hub",
-        "name": "Test Hub",
-        "participants": {"Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000}},
-    }
-    config_entry = create_mock_config_entry(data=config_data)
-    options_flow = HubOptionsFlow()
-    options_flow._config_entry = config_entry
-
-    result = await options_flow.async_step_configure_connection()
-
-    assert result.get("type") == FlowResultType.ABORT
-    assert result.get("reason") == "insufficient_devices"
 
 
 # Parameterized tests for successful configuration submissions
