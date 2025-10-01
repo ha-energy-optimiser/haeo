@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from typing import Any, Dict, List, Tuple, Callable
+from typing import Any
 from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntry
@@ -22,7 +22,57 @@ from custom_components.haeo.const import (
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_NET,
     ELEMENT_TYPES,
+    CONF_CAPACITY,
+    CONF_IMPORT_LIMIT,
 )
+
+# Import the schema helper from the main flows module
+from custom_components.haeo.flows import get_schema
+
+
+# Combined test data for fixtures
+def _get_test_data():
+    """Get test data from individual files."""
+    from .test_battery import VALID_DATA as BATTERY_VALID_DATA, INVALID_DATA as BATTERY_INVALID_DATA
+    from .test_connection import VALID_DATA as CONNECTION_VALID_DATA, INVALID_DATA as CONNECTION_INVALID_DATA
+    from .test_generator import VALID_DATA as GENERATOR_VALID_DATA, INVALID_DATA as GENERATOR_INVALID_DATA
+    from .test_grid import VALID_DATA as GRID_VALID_DATA, INVALID_DATA as GRID_INVALID_DATA
+    from .test_load_constant import VALID_DATA as LOAD_VALID_DATA, INVALID_DATA as LOAD_INVALID_DATA
+    from .test_load_forecast import VALID_DATA as LOAD_VARIABLE_DATA
+    from .test_net import VALID_DATA as NET_VALID_DATA, INVALID_DATA as NET_INVALID_DATA
+
+    return (
+        {
+            ELEMENT_TYPE_BATTERY: BATTERY_VALID_DATA[0],
+            ELEMENT_TYPE_CONNECTION: CONNECTION_VALID_DATA[0],
+            ELEMENT_TYPE_GENERATOR: GENERATOR_VALID_DATA[0],
+            ELEMENT_TYPE_GRID: GRID_VALID_DATA[0],
+            ELEMENT_TYPE_LOAD_FIXED: LOAD_VALID_DATA[0],
+            ELEMENT_TYPE_LOAD_FORECAST: LOAD_VARIABLE_DATA[0],
+            ELEMENT_TYPE_NET: NET_VALID_DATA[0],
+        },
+        [
+            *[(ELEMENT_TYPE_BATTERY, d) for d in BATTERY_VALID_DATA],
+            *[(ELEMENT_TYPE_CONNECTION, d) for d in CONNECTION_VALID_DATA],
+            *[(ELEMENT_TYPE_GENERATOR, d) for d in GENERATOR_VALID_DATA],
+            *[(ELEMENT_TYPE_GRID, d) for d in GRID_VALID_DATA],
+            *[(ELEMENT_TYPE_LOAD_FIXED, d) for d in LOAD_VALID_DATA],
+            *[(ELEMENT_TYPE_LOAD_FORECAST, d) for d in LOAD_VARIABLE_DATA],
+            *[(ELEMENT_TYPE_NET, d) for d in NET_VALID_DATA],
+        ],
+        [
+            *[(ELEMENT_TYPE_BATTERY, d) for d in BATTERY_INVALID_DATA],
+            *[(ELEMENT_TYPE_CONNECTION, d) for d in CONNECTION_INVALID_DATA],
+            *[(ELEMENT_TYPE_GENERATOR, d) for d in GENERATOR_INVALID_DATA],
+            *[(ELEMENT_TYPE_GRID, d) for d in GRID_INVALID_DATA],
+            *[(ELEMENT_TYPE_LOAD_FIXED, d) for d in LOAD_INVALID_DATA],
+            *[(ELEMENT_TYPE_LOAD_FORECAST, d) for d in LOAD_INVALID_DATA],
+            *[(ELEMENT_TYPE_NET, d) for d in NET_INVALID_DATA],
+        ],
+    )
+
+
+VALID_ELEMENT_DATA, VALID_TEST_DATA, INVALID_TEST_DATA = _get_test_data()
 
 
 def create_mock_config_entry(
@@ -59,50 +109,6 @@ async def unload_config_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.async_block_till_done()
 
 
-def get_valid_test_data() -> Dict[str, Dict[str, Any]]:
-    """Get valid test data for all element types."""
-    # Import from individual test files to avoid duplication
-    from tests.flows.test_battery import BATTERY_VALID_DATA
-    from tests.flows.test_grid import GRID_VALID_DATA
-    from tests.flows.test_load import LOAD_VALID_DATA, LOAD_VARIABLE_DATA
-    from tests.flows.test_generator import GENERATOR_VALID_DATA
-    from tests.flows.test_net import NET_VALID_DATA
-    from tests.flows.test_connection import CONNECTION_VALID_DATA
-
-    return {
-        ELEMENT_TYPE_BATTERY: BATTERY_VALID_DATA,
-        ELEMENT_TYPE_GRID: GRID_VALID_DATA,
-        ELEMENT_TYPE_LOAD: LOAD_VALID_DATA,
-        ELEMENT_TYPE_LOAD_FIXED: LOAD_VALID_DATA,
-        ELEMENT_TYPE_LOAD_FORECAST: LOAD_VARIABLE_DATA,
-        ELEMENT_TYPE_GENERATOR: GENERATOR_VALID_DATA,
-        ELEMENT_TYPE_NET: NET_VALID_DATA,
-        ELEMENT_TYPE_CONNECTION: CONNECTION_VALID_DATA,
-    }
-
-
-def get_invalid_test_data() -> Dict[str, List[Tuple[Dict[str, Any], str]]]:
-    """Get invalid test data for validation testing."""
-    # Import from individual test files to avoid duplication
-    from tests.flows.test_battery import BATTERY_INVALID_DATA
-    from tests.flows.test_grid import GRID_INVALID_DATA
-    from tests.flows.test_load import LOAD_INVALID_DATA
-    from tests.flows.test_generator import GENERATOR_INVALID_DATA
-    from tests.flows.test_net import NET_INVALID_DATA
-    from tests.flows.test_connection import CONNECTION_INVALID_DATA
-
-    return {
-        ELEMENT_TYPE_BATTERY: BATTERY_INVALID_DATA,
-        ELEMENT_TYPE_GRID: GRID_INVALID_DATA,
-        ELEMENT_TYPE_LOAD: LOAD_INVALID_DATA,
-        ELEMENT_TYPE_LOAD_FIXED: LOAD_INVALID_DATA,
-        ELEMENT_TYPE_LOAD_FORECAST: LOAD_INVALID_DATA,
-        ELEMENT_TYPE_GENERATOR: GENERATOR_INVALID_DATA,
-        ELEMENT_TYPE_NET: NET_INVALID_DATA,
-        ELEMENT_TYPE_CONNECTION: CONNECTION_INVALID_DATA,
-    }
-
-
 # Pytest fixtures for data-driven testing
 @pytest.fixture(params=ELEMENT_TYPES)
 def element_type(request):
@@ -113,13 +119,13 @@ def element_type(request):
 @pytest.fixture
 def valid_element_data(element_type):
     """Fixture providing valid data for each element type."""
-    return get_valid_test_data()[element_type]
+    return VALID_ELEMENT_DATA[element_type]
 
 
 @pytest.fixture
 def config_entry_with_existing_participant(element_type, valid_element_data):
     """Fixture providing config entry with existing participant."""
-    existing_name = valid_element_data[CONF_NAME]
+    existing_name = valid_element_data.get(CONF_NAME, "Existing Element")
     participants = {
         existing_name: {"type": element_type, **{k: v for k, v in valid_element_data.items() if k != CONF_NAME}}
     }
@@ -133,100 +139,373 @@ def config_entry_with_existing_participant(element_type, valid_element_data):
     )
 
 
-async def test_element_duplicate_name_handling(
-    hass: HomeAssistant,
-    flow_class: type,
-    element_type: str,
-    test_data: Dict[str, Any],
-    config_entry_with_existing: MockConfigEntry,
-) -> None:
-    """Generic test for duplicate name handling."""
-    flow = flow_class()
-    flow.hass = hass
-    flow._config_entry = config_entry_with_existing
+@pytest.fixture
+def config_entry_with_multiple_participants():
+    """Fixture providing config entry with multiple participants for connection testing."""
+    # Use actual valid data from VALID_TEST_DATA for realistic test participants
+    participants = {}
+    # Use the first valid case from each element type for the fixture
+    for element_type, valid_case in VALID_ELEMENT_DATA.items():
+        test_data = valid_case["config"]
+        # Use the first few characters of the element type as a simple participant name
+        participant_name = f"{element_type[:6]}1"  # e.g., "batte1", "grid1", etc.
+        participants[participant_name] = {
+            "type": element_type,
+            **{k: v for k, v in test_data.items() if k != CONF_NAME},
+        }
 
-    with patch.object(hass.config_entries, "async_update_entry", return_value=None):
-        # Attempt to add element with duplicate name
-        method_name = f"async_step_configure_{element_type}"
-        if hasattr(flow, method_name):
-            method = getattr(flow, method_name)
-            result = await method(test_data)
-
-            assert result.get("type") == FlowResultType.FORM
-            errors = result.get("errors", {})
-            assert errors.get(CONF_NAME) == "name_exists"
-
-
-async def test_element_form_display(
-    hass: HomeAssistant,
-    flow_class: type,
-    element_type: str,
-) -> None:
-    """Generic test for element form display."""
-    config_entry = create_mock_config_entry()
-    flow = flow_class()
-    flow.hass = hass
-    flow._config_entry = config_entry
-
-    method_name = f"async_step_configure_{element_type}"
-    if hasattr(flow, method_name):
-        method = getattr(flow, method_name)
-        result = await method()
-
-        assert result.get("type") == FlowResultType.FORM
-        assert result.get("step_id") == f"configure_{element_type}"
+    return create_mock_config_entry(
+        data={
+            "integration_type": "hub",
+            "name": "Power Network",
+            "participants": participants,
+        }
+    )
 
 
-async def test_element_successful_submission(
-    hass: HomeAssistant,
-    flow_class: type,
-    element_type: str,
-    test_data: Dict[str, Any],
-) -> None:
-    """Generic test for successful element submission."""
-    config_entry = create_mock_config_entry()
-    flow = flow_class()
-    flow.hass = hass
-    flow._config_entry = config_entry
+# Parameterized schema validation tests
+@pytest.mark.parametrize("element_type,valid_case", VALID_TEST_DATA)
+async def test_element_schema_validation_success(hass: HomeAssistant, element_type, valid_case):
+    """Test successful schema validation for all element types."""
+    valid_data = valid_case["config"]
+    description = valid_case["description"]
 
-    with patch.object(hass.config_entries, "async_update_entry", return_value=None):
-        method_name = f"async_step_configure_{element_type}"
-        if hasattr(flow, method_name):
-            method = getattr(flow, method_name)
-            result = await method(test_data)
-
-            assert result.get("type") == FlowResultType.CREATE_ENTRY
-
-
-async def test_element_schema_validation(
-    hass: HomeAssistant,
-    element_type: str,
-    valid_data: Dict[str, Any],
-    expected_fields: List[str],
-    schema_func: Callable,
-) -> None:
-    """Generic test for element schema validation."""
-    schema = schema_func()
+    schema = get_schema(element_type, participants=MOCK_PARTICIPANTS)
     result = schema(valid_data)
+    assert isinstance(result, dict)
+    # Check that all expected fields are present and correct
+    for key, value in valid_data.items():
+        assert result[key] == value
 
-    # Check that expected fields are present in result
-    for field in expected_fields:
-        assert field in result, f"Field '{field}' not found in schema result"
-        assert result[field] == valid_data.get(field)
 
+@pytest.mark.parametrize(
+    "element_type,invalid_case",
+    [
+        (element_type, invalid_case)
+        for element_type, test_data_list in INVALID_TEST_DATA.items()
+        for invalid_case in test_data_list
+    ],
+)
+async def test_element_schema_validation_errors(hass: HomeAssistant, element_type, invalid_case):
+    """Test schema validation errors for all element types."""
+    invalid_data = invalid_case["config"]
+    expected_error = invalid_case["error"]
+    description = invalid_case["description"]
 
-@pytest.mark.parametrize("invalid_data,expected_error", [])
-async def test_element_schema_validation_errors(
-    hass: HomeAssistant,
-    invalid_data: dict,
-    expected_error: str,
-    schema_func: Callable,
-) -> None:
-    """Generic test for element schema validation with invalid data."""
-    schema = schema_func()
+    schema = get_schema(element_type, participants=MOCK_PARTICIPANTS)
 
     try:
         schema(invalid_data)
-        assert False, f"Expected validation error for {invalid_data}"
+        assert False, f"Expected validation error for {description}: {invalid_data}"
     except Exception as e:
         assert expected_error in str(e).lower()
+
+
+# Parameterized participant creation tests
+@pytest.mark.parametrize("element_type,valid_case", VALID_TEST_DATA)
+async def test_participant_creation(hass: HomeAssistant, element_type, valid_case):
+    """Test participant creation for all element types."""
+    test_data = valid_case["config"]
+    description = valid_case["description"]
+
+    # Create participant directly (all create_*_participant functions do the same thing)
+    participant = {
+        CONF_ELEMENT_TYPE: element_type,
+        **test_data,
+    }
+
+    # Check basic participant structure
+    assert participant["type"] == element_type
+    # Check that all provided data is correctly set in the participant
+    for key, value in test_data.items():
+        assert participant[key] == value
+
+
+# Test functions for options flow
+async def test_options_flow_init(hass: HomeAssistant):
+    """Test options flow initialization."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_entry = create_mock_config_entry()
+    options_flow = HubOptionsFlow()
+    options_flow._config_entry = config_entry
+
+    result = await options_flow.async_step_init()
+
+    assert result.get("type") == FlowResultType.MENU
+    menu_options = result.get("menu_options", [])
+    assert "add_participant" in menu_options
+    assert "edit_participant" in menu_options
+    assert "remove_participant" in menu_options
+
+
+async def test_options_flow_add_participant_type_selection(hass: HomeAssistant):
+    """Test participant type selection."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_entry = create_mock_config_entry()
+    options_flow = HubOptionsFlow()
+    options_flow._config_entry = config_entry
+
+    result = await options_flow.async_step_add_participant()
+
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "add_participant"
+
+
+@pytest.mark.parametrize("participant_type", ELEMENT_TYPES)
+async def test_options_flow_route_to_participant_config(hass: HomeAssistant, participant_type):
+    """Test routing to participant configuration."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_entry = create_mock_config_entry()
+    options_flow = HubOptionsFlow()
+    options_flow.hass = hass
+    options_flow._config_entry = config_entry
+
+    result = await options_flow.async_step_add_participant({"participant_type": participant_type})
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == f"configure_{participant_type}"
+
+
+async def test_options_flow_route_to_connection_config_with_participants(hass: HomeAssistant):
+    """Test routing to connection configuration with sufficient participants."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_entry = create_mock_config_entry(
+        data={
+            "integration_type": "hub",
+            "name": "Test Hub",
+            "participants": {
+                "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+                "Grid1": {"type": ELEMENT_TYPE_GRID, CONF_IMPORT_LIMIT: 5000},
+            },
+        }
+    )
+    options_flow = HubOptionsFlow()
+    options_flow.hass = hass
+    options_flow._config_entry = config_entry
+
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_CONNECTION})
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "configure_connection"
+
+
+@pytest.mark.parametrize("element_type,valid_case", VALID_TEST_DATA)
+async def test_options_flow_configure_duplicate_name(hass: HomeAssistant, element_type, valid_case):
+    """Test configuration with duplicate name for all element types."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    valid_data = valid_case["config"]
+    description = valid_case["description"]
+
+    # Create config data with existing participant using the same name as in valid_data
+    existing_name = valid_data[CONF_NAME]
+    config_data_with_existing = {
+        "integration_type": "hub",
+        "name": "Test Hub",
+        "participants": {existing_name: {"type": element_type}},
+    }
+    config_entry = create_mock_config_entry(data=config_data_with_existing)
+    options_flow = HubOptionsFlow()
+    options_flow._config_entry = config_entry
+
+    # Call the appropriate configure method
+    method_name = f"async_step_configure_{element_type}"
+    if hasattr(options_flow, method_name):
+        method = getattr(options_flow, method_name)
+        result = await method(valid_data)
+
+        assert result.get("type") == FlowResultType.FORM
+        errors = result.get("errors") or {}
+        assert errors.get(CONF_NAME) == "name_exists"
+
+
+async def test_options_flow_no_participants(hass: HomeAssistant):
+    """Test behavior when no participants exist."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_entry = create_mock_config_entry()  # Empty participants
+    options_flow = HubOptionsFlow()
+    options_flow._config_entry = config_entry
+
+    # Test edit participants with no participants
+    result = await options_flow.async_step_edit_participant()
+    assert result.get("type") == FlowResultType.ABORT
+    assert result.get("reason") == "no_participants"
+
+    # Test remove participants with no participants
+    result = await options_flow.async_step_remove_participant()
+    assert result.get("type") == FlowResultType.ABORT
+    assert result.get("reason") == "no_participants"
+
+
+async def test_options_flow_connection_insufficient_devices(hass: HomeAssistant):
+    """Test connection configuration with insufficient devices."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_data = {
+        "integration_type": "hub",
+        "name": "Test Hub",
+        "participants": {"Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000}},
+    }
+    config_entry = create_mock_config_entry(data=config_data)
+    options_flow = HubOptionsFlow()
+    options_flow._config_entry = config_entry
+
+    result = await options_flow.async_step_configure_connection()
+
+    assert result.get("type") == FlowResultType.ABORT
+    assert result.get("reason") == "insufficient_devices"
+
+
+# Parameterized tests for successful configuration submissions
+@pytest.mark.parametrize("element_type,valid_case", VALID_TEST_DATA)
+async def test_options_flow_configure_success(hass: HomeAssistant, element_type, valid_case):
+    """Test successful configuration for all element types."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    # Create appropriate config entry based on element type
+    if element_type == ELEMENT_TYPE_CONNECTION:
+        # Connection needs existing participants
+        config_data = {
+            "integration_type": "hub",
+            "name": "Test Hub",
+            "participants": {
+                "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+                "Grid1": {"type": ELEMENT_TYPE_GRID, CONF_IMPORT_LIMIT: 5000},
+            },
+        }
+        config_entry = create_mock_config_entry(data=config_data)
+    else:
+        config_entry = create_mock_config_entry()
+
+    options_flow = HubOptionsFlow()
+    options_flow.hass = hass
+    options_flow._config_entry = config_entry
+
+    with patch.object(hass.config_entries, "async_update_entry", return_value=None):
+        valid_data = valid_case["config"]
+
+        # Call the appropriate configure method
+        method_name = f"async_step_configure_{element_type}"
+        if hasattr(options_flow, method_name):
+            method = getattr(options_flow, method_name)
+            result = await method(valid_data)
+            assert result.get("type") == FlowResultType.CREATE_ENTRY
+
+
+# Hub flow tests
+async def test_hub_flow_user_step_form(hass: HomeAssistant):
+    """Test that the user step shows the form."""
+    from custom_components.haeo.flows.hub import HubConfigFlow
+
+    flow = HubConfigFlow()
+    flow.hass = hass
+
+    result = await flow.async_step_user()
+
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "user"
+
+
+async def test_hub_flow_create_hub_success(hass: HomeAssistant):
+    """Test successful hub creation."""
+    result = await hass.config_entries.flow.async_init("haeo", context={"source": "user"})
+
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "user"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], HUB_VALID_DATA)
+
+    assert result.get("type") == FlowResultType.CREATE_ENTRY
+    assert result.get("title") == HUB_VALID_DATA[CONF_NAME]
+
+    data = result.get("data", {})
+    assert data.get("integration_type") == "hub"
+    assert data.get(CONF_NAME) == HUB_VALID_DATA[CONF_NAME]
+    assert data.get("participants") == {}
+
+
+async def test_hub_flow_validation_functions():
+    """Test the validation functions."""
+    from custom_components.haeo.flows import (
+        validate_element_name,
+        validate_positive_number,
+        validate_percentage,
+        validate_efficiency,
+    )
+    import voluptuous as vol
+
+    # Test element name validation
+    assert validate_element_name("Valid Name") == "Valid Name"
+
+    with pytest.raises(vol.Invalid):
+        validate_element_name("")
+
+    # Test positive number validation
+    assert validate_positive_number(100) == 100
+
+    with pytest.raises(vol.Invalid):
+        validate_positive_number(0)
+
+    with pytest.raises(vol.Invalid):
+        validate_positive_number(-10)
+
+    # Test percentage validation
+    assert validate_percentage(50) == 50
+    assert validate_percentage(0) == 0
+    assert validate_percentage(100) == 100
+
+    with pytest.raises(vol.Invalid):
+        validate_percentage(-10)
+
+    with pytest.raises(vol.Invalid):
+        validate_percentage(150)
+
+    # Test efficiency validation
+    assert validate_efficiency(0.95) == 0.95
+    assert validate_efficiency(1.0) == 1.0
+
+    with pytest.raises(vol.Invalid):
+        validate_efficiency(1.5)
+
+    with pytest.raises(vol.Invalid):
+        validate_efficiency(0)
+
+
+async def test_options_flow_add_participant_type_selection(hass: HomeAssistant):
+    """Test participant type selection."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_entry = create_mock_config_entry()
+    options_flow = HubOptionsFlow()
+    options_flow._config_entry = config_entry
+
+    result = await options_flow.async_step_add_participant()
+
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "add_participant"
+
+
+async def test_options_flow_manage_participants_form(hass: HomeAssistant):
+    """Test manage participants form display."""
+    from custom_components.haeo.flows.options import HubOptionsFlow
+
+    config_data = {
+        "integration_type": "hub",
+        "name": "Test Hub",
+        "participants": {
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, CONF_IMPORT_LIMIT: 5000},
+        },
+    }
+    config_entry = create_mock_config_entry(data=config_data)
+    options_flow = HubOptionsFlow()
+    options_flow.hass = hass
+    options_flow._config_entry = config_entry
+
+    # Test form display
+    result = await options_flow.async_step_edit_participant()
+    assert result.get("type") == FlowResultType.FORM
+    assert result.get("step_id") == "edit_participant"

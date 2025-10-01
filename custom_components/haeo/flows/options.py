@@ -15,27 +15,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
-from ..const import (
-    ELEMENT_TYPE_BATTERY,
-    ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_FIXED,
-    ELEMENT_TYPE_LOAD_FORECAST,
-    ELEMENT_TYPE_GENERATOR,
-    ELEMENT_TYPE_NET,
-    ELEMENT_TYPE_CONNECTION,
-    get_element_type_name,
-)
-from .battery import get_battery_schema, create_battery_participant
-from .grid import get_grid_schema, create_grid_participant
-from .load_constant import get_constant_load_schema, create_constant_load_participant
-from .load_forecast import get_forecast_load_schema, create_forecast_load_participant
-from .generator import get_generator_schema, create_generator_participant
-from .net import get_net_schema, create_net_participant
-from .connection import (
-    get_connection_schema,
-    create_connection_participant,
-    validate_connection_config,
-)
+from ..const import ELEMENT_TYPES, get_element_type_name, CONF_ELEMENT_TYPE
+from . import get_schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,31 +36,13 @@ class HubOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             participant_type = user_input["participant_type"]
 
-            # Route to specific configuration step
-            if participant_type == ELEMENT_TYPE_LOAD_FIXED:
-                return await self.async_step_configure_fixed_load()
-            elif participant_type == ELEMENT_TYPE_LOAD_FORECAST:
-                return await self.async_step_configure_forecast_load()
-            elif participant_type == ELEMENT_TYPE_BATTERY:
-                return await self.async_step_configure_battery()
-            elif participant_type == ELEMENT_TYPE_GRID:
-                return await self.async_step_configure_grid()
-            elif participant_type == ELEMENT_TYPE_GENERATOR:
-                return await self.async_step_configure_generator()
-            elif participant_type == ELEMENT_TYPE_NET:
-                return await self.async_step_configure_net()
-            elif participant_type == ELEMENT_TYPE_CONNECTION:
-                return await self.async_step_configure_connection()
+            # Route to generic configuration step
+            return await self.async_step_configure_element(participant_type)
 
         # Show participant type selection
         participant_types = [
-            SelectOptionDict(value=ELEMENT_TYPE_LOAD_FIXED, label=get_element_type_name(ELEMENT_TYPE_LOAD_FIXED)),
-            SelectOptionDict(value=ELEMENT_TYPE_LOAD_FORECAST, label=get_element_type_name(ELEMENT_TYPE_LOAD_FORECAST)),
-            SelectOptionDict(value=ELEMENT_TYPE_BATTERY, label=get_element_type_name(ELEMENT_TYPE_BATTERY)),
-            SelectOptionDict(value=ELEMENT_TYPE_GRID, label=get_element_type_name(ELEMENT_TYPE_GRID)),
-            SelectOptionDict(value=ELEMENT_TYPE_GENERATOR, label=get_element_type_name(ELEMENT_TYPE_GENERATOR)),
-            SelectOptionDict(value=ELEMENT_TYPE_NET, label=get_element_type_name(ELEMENT_TYPE_NET)),
-            SelectOptionDict(value=ELEMENT_TYPE_CONNECTION, label=get_element_type_name(ELEMENT_TYPE_CONNECTION)),
+            SelectOptionDict(value=element_type, label=get_element_type_name(element_type))
+            for element_type in ELEMENT_TYPES
         ]
 
         return self.async_show_form(
@@ -96,10 +59,10 @@ class HubOptionsFlow(config_entries.OptionsFlow):
             ),
         )
 
-    async def async_step_configure_battery(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
+    async def async_step_configure_element(
+        self, element_type: str, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
     ):
-        """Configure battery participant."""
+        """Configure participant."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -111,203 +74,20 @@ class HubOptionsFlow(config_entries.OptionsFlow):
             ):
                 errors[CONF_NAME] = "name_exists"
             else:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(
-                        current_config[CONF_NAME], create_battery_participant(user_input)
-                    )
-                else:
-                    return await self._add_participant(name, create_battery_participant(user_input))
+                if not errors:
+                    # Add or update participant in configuration
+                    participant = {CONF_ELEMENT_TYPE: element_type, **user_input}
+                    if current_config:
+                        return await self._update_participant(current_config[CONF_NAME], participant)
+                    else:
+                        return await self._add_participant(name, participant)
+
+        # Get participants for schema if needed
+        participants = list(self.config_entry.data.get("participants", {}).values())
 
         return self.async_show_form(
-            step_id="configure_battery",
-            data_schema=get_battery_schema(current_config),
-            errors=errors,
-        )
-
-    async def async_step_configure_grid(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
-    ):
-        """Configure grid participant."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            name = user_input[CONF_NAME]
-
-            # Check for duplicate names (excluding current if editing)
-            if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
-            ):
-                errors[CONF_NAME] = "name_exists"
-            else:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(
-                        current_config[CONF_NAME], create_grid_participant(user_input)
-                    )
-                else:
-                    return await self._add_participant(name, create_grid_participant(user_input))
-
-        return self.async_show_form(
-            step_id="configure_grid",
-            data_schema=get_grid_schema(current_config),
-            errors=errors,
-        )
-
-    async def async_step_configure_fixed_load(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
-    ):
-        """Configure fixed load participant."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            name = user_input[CONF_NAME]
-
-            # Check for duplicate names (excluding current if editing)
-            if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
-            ):
-                errors[CONF_NAME] = "name_exists"
-            else:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(
-                        current_config[CONF_NAME], create_constant_load_participant(user_input)
-                    )
-                else:
-                    return await self._add_participant(name, create_constant_load_participant(user_input))
-
-        return self.async_show_form(
-            step_id="configure_fixed_load",
-            data_schema=get_constant_load_schema(current_config),
-            errors=errors,
-        )
-
-    async def async_step_configure_forecast_load(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
-    ):
-        """Configure forecast load participant."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            name = user_input[CONF_NAME]
-
-            # Check for duplicate names (excluding current if editing)
-            if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
-            ):
-                errors[CONF_NAME] = "name_exists"
-            else:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(
-                        current_config[CONF_NAME], create_forecast_load_participant(user_input)
-                    )
-                else:
-                    return await self._add_participant(name, create_forecast_load_participant(user_input))
-
-        return self.async_show_form(
-            step_id="configure_forecast_load",
-            data_schema=get_forecast_load_schema(current_config),
-            errors=errors,
-        )
-
-    async def async_step_configure_generator(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
-    ):
-        """Configure generator participant."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            name = user_input[CONF_NAME]
-
-            # Check for duplicate names (excluding current if editing)
-            if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
-            ):
-                errors[CONF_NAME] = "name_exists"
-            else:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(
-                        current_config[CONF_NAME], create_generator_participant(user_input)
-                    )
-                else:
-                    return await self._add_participant(name, create_generator_participant(user_input))
-
-        return self.async_show_form(
-            step_id="configure_generator",
-            data_schema=get_generator_schema(current_config),
-            errors=errors,
-        )
-
-    async def async_step_configure_net(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
-    ):
-        """Configure net participant."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            name = user_input[CONF_NAME]
-
-            # Check for duplicate names (excluding current if editing)
-            if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
-            ):
-                errors[CONF_NAME] = "name_exists"
-            else:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(current_config[CONF_NAME], create_net_participant(user_input))
-                else:
-                    return await self._add_participant(name, create_net_participant(user_input))
-
-        return self.async_show_form(
-            step_id="configure_net",
-            data_schema=get_net_schema(current_config),
-            errors=errors,
-        )
-
-    async def async_step_configure_connection(
-        self, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
-    ):
-        """Configure connection participant."""
-        errors: dict[str, str] = {}
-        participants = self.config_entry.data.get("participants", {})
-
-        # Filter out existing connections to avoid connecting connections
-        device_participants = {
-            name: config for name, config in participants.items() if config.get("type") != ELEMENT_TYPE_CONNECTION
-        }
-
-        if len(device_participants) < 2:
-            return self.async_abort(reason="insufficient_devices")
-
-        if user_input is not None:
-            name = user_input[CONF_NAME]
-
-            # Check for duplicate names (excluding current if editing)
-            if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
-            ):
-                errors[CONF_NAME] = "name_exists"
-
-            # Validate connection configuration
-            connection_errors = validate_connection_config(user_input)
-            errors.update(connection_errors)
-
-            if not errors:
-                # Add or update participant in configuration
-                if current_config:
-                    return await self._update_participant(
-                        current_config[CONF_NAME], create_connection_participant(user_input)
-                    )
-                else:
-                    return await self._add_participant(name, create_connection_participant(user_input))
-
-        return self.async_show_form(
-            step_id="configure_connection",
-            data_schema=get_connection_schema(device_participants, current_config),
+            step_id=f"configure_{element_type}",
+            data_schema=get_schema(element_type, participants=participants),
             errors=errors,
         )
 
@@ -320,23 +100,11 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             participant_name = user_input["participant"]
-
-            # Route to specific edit step based on participant type
             participant_config = participants[participant_name]
             participant_type = participant_config.get("type")
 
-            if participant_type == ELEMENT_TYPE_BATTERY:
-                return await self.async_step_edit_battery(participant_name, participant_config)
-            elif participant_type == ELEMENT_TYPE_GRID:
-                return await self.async_step_edit_grid(participant_name, participant_config)
-            elif participant_type in [ELEMENT_TYPE_LOAD_FIXED, ELEMENT_TYPE_LOAD_FORECAST]:
-                return await self.async_step_edit_load(participant_name, participant_config)
-            elif participant_type == ELEMENT_TYPE_GENERATOR:
-                return await self.async_step_edit_generator(participant_name, participant_config)
-            elif participant_type == ELEMENT_TYPE_NET:
-                return await self.async_step_edit_net(participant_name, participant_config)
-            elif participant_type == ELEMENT_TYPE_CONNECTION:
-                return await self.async_step_edit_connection(participant_name, participant_config)
+            # Route to generic configure step for editing
+            return await self.async_step_configure_element(participant_type, current_config=participant_config)
 
         participant_options = list(participants.keys())
 
@@ -353,52 +121,6 @@ class HubOptionsFlow(config_entries.OptionsFlow):
                 }
             ),
         )
-
-    async def async_step_edit_battery(
-        self, participant_name: str, participant_config: dict[str, Any], user_input: dict[str, Any] | None = None
-    ):
-        """Edit battery participant."""
-        # Use the configure function with current config for editing
-        return await self.async_step_configure_battery(user_input, participant_config)
-
-    async def async_step_edit_grid(
-        self, participant_name: str, participant_config: dict[str, Any], user_input: dict[str, Any] | None = None
-    ):
-        """Edit grid participant."""
-        # Use the configure function with current config for editing
-        return await self.async_step_configure_grid(user_input, participant_config)
-
-    async def async_step_edit_load(
-        self, participant_name: str, participant_config: dict[str, Any], user_input: dict[str, Any] | None = None
-    ):
-        """Edit load participant."""
-        # Use the appropriate configure function with current config for editing
-        element_type = participant_config.get("type")
-        if element_type == ELEMENT_TYPE_LOAD_FIXED:
-            return await self.async_step_configure_fixed_load(user_input, participant_config)
-        else:
-            return await self.async_step_configure_forecast_load(user_input, participant_config)
-
-    async def async_step_edit_generator(
-        self, participant_name: str, participant_config: dict[str, Any], user_input: dict[str, Any] | None = None
-    ):
-        """Edit generator participant."""
-        # Use the configure function with current config for editing
-        return await self.async_step_configure_generator(user_input, participant_config)
-
-    async def async_step_edit_net(
-        self, participant_name: str, participant_config: dict[str, Any], user_input: dict[str, Any] | None = None
-    ):
-        """Edit net participant."""
-        # Use the configure function with current config for editing
-        return await self.async_step_configure_net(user_input, participant_config)
-
-    async def async_step_edit_connection(
-        self, participant_name: str, participant_config: dict[str, Any], user_input: dict[str, Any] | None = None
-    ):
-        """Edit connection participant."""
-        # Use the configure function with current config for editing
-        return await self.async_step_configure_connection(user_input, participant_config)
 
     async def async_step_remove_participant(self, user_input: dict[str, Any] | None = None):
         """Remove a participant."""
