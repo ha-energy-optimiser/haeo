@@ -1,7 +1,7 @@
-from .entity import Entity
+from .element import Element
 
 
-class Net(Entity):
+class Net(Element):
     """Net entity for electrical system modeling."""
 
     def __init__(self, name: str, period: int, n_periods: int):

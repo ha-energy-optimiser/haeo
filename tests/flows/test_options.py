@@ -5,13 +5,13 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.const import CONF_NAME
 
 from custom_components.haeo.flows.options import HubOptionsFlow
-from custom_components.haeo.flows.connection import ENTITY_TYPE_CONNECTION
 from custom_components.haeo.const import (
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
-    ENTITY_TYPE_LOAD,
-    ENTITY_TYPE_GENERATOR,
-    ENTITY_TYPE_NET,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_NET,
+    ELEMENT_TYPE_CONNECTION,
     CONF_CAPACITY,
 )
 
@@ -52,7 +52,7 @@ async def test_options_flow_route_to_grid_config(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ENTITY_TYPE_GRID})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_GRID})
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "configure_grid"
 
@@ -64,7 +64,7 @@ async def test_options_flow_route_to_load_config(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ENTITY_TYPE_LOAD})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_LOAD})
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "configure_load"
 
@@ -76,7 +76,7 @@ async def test_options_flow_route_to_generator_config(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ENTITY_TYPE_GENERATOR})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_GENERATOR})
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "configure_generator"
 
@@ -88,7 +88,7 @@ async def test_options_flow_route_to_net_config(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ENTITY_TYPE_NET})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_NET})
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "configure_net"
 
@@ -99,8 +99,8 @@ async def test_options_flow_route_to_connection_config(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -108,7 +108,7 @@ async def test_options_flow_route_to_connection_config(hass: HomeAssistant):
     options_flow.hass = hass
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ENTITY_TYPE_CONNECTION})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_CONNECTION})
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "configure_connection"
 
@@ -119,7 +119,7 @@ async def test_options_flow_route_to_battery_config(hass: HomeAssistant):
     options_flow = HubOptionsFlow()
     options_flow._config_entry = config_entry
 
-    result = await options_flow.async_step_add_participant({"participant_type": ENTITY_TYPE_BATTERY})
+    result = await options_flow.async_step_add_participant({"participant_type": ELEMENT_TYPE_BATTERY})
 
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "configure_battery"
@@ -130,7 +130,7 @@ async def test_options_flow_battery_duplicate_name(hass: HomeAssistant):
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Existing Battery": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 5000}},
+        "participants": {"Existing Battery": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 5000}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -176,7 +176,7 @@ async def test_options_flow_connection_insufficient_devices(hass: HomeAssistant)
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000}},
+        "participants": {"Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -294,8 +294,8 @@ async def test_options_flow_configure_connection_success(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -327,7 +327,7 @@ async def test_options_flow_grid_duplicate_name(hass: HomeAssistant):
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Existing Grid": {"type": ENTITY_TYPE_GRID}},
+        "participants": {"Existing Grid": {"type": ELEMENT_TYPE_GRID}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -348,7 +348,7 @@ async def test_options_flow_load_duplicate_name(hass: HomeAssistant):
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Existing Load": {"type": ENTITY_TYPE_LOAD}},
+        "participants": {"Existing Load": {"type": ELEMENT_TYPE_LOAD}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -370,7 +370,7 @@ async def test_options_flow_generator_duplicate_name(hass: HomeAssistant):
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Existing Generator": {"type": ENTITY_TYPE_GENERATOR}},
+        "participants": {"Existing Generator": {"type": ELEMENT_TYPE_GENERATOR}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -391,7 +391,7 @@ async def test_options_flow_net_duplicate_name(hass: HomeAssistant):
     config_data = {
         "integration_type": "hub",
         "name": "Test Hub",
-        "participants": {"Existing Net": {"type": ENTITY_TYPE_NET}},
+        "participants": {"Existing Net": {"type": ELEMENT_TYPE_NET}},
     }
     config_entry = create_mock_config_entry(data=config_data)
     options_flow = HubOptionsFlow()
@@ -412,9 +412,9 @@ async def test_options_flow_connection_duplicate_name(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Connection1": {"type": ENTITY_TYPE_CONNECTION, "source": "Battery1", "target": "Grid1"},
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Connection1": {"type": ELEMENT_TYPE_CONNECTION, "source": "Battery1", "target": "Grid1"},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -441,8 +441,8 @@ async def test_options_flow_remove_participant_form(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -462,8 +462,8 @@ async def test_options_flow_remove_participant_success(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -534,8 +534,8 @@ async def test_options_flow_manage_participants_form(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -555,8 +555,8 @@ async def test_options_flow_manage_participants_success(hass: HomeAssistant):
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)
@@ -588,9 +588,9 @@ async def test_options_flow_manage_participants_no_participants(hass: HomeAssist
         "integration_type": "hub",
         "name": "Test Hub",
         "participants": {
-            "Battery1": {"type": ENTITY_TYPE_BATTERY, CONF_CAPACITY: 10000},
-            "Grid1": {"type": ENTITY_TYPE_GRID, "import_limit": 5000},
-            "Existing Connection": {"type": ENTITY_TYPE_CONNECTION},
+            "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
+            "Grid1": {"type": ELEMENT_TYPE_GRID, "import_limit": 5000},
+            "Existing Connection": {"type": ELEMENT_TYPE_CONNECTION},
         },
     }
     config_entry = create_mock_config_entry(data=config_data)

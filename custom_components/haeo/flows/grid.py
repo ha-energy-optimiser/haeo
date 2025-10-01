@@ -16,7 +16,7 @@ from homeassistant.helpers.selector import (
 )
 
 from ..const import (
-    ENTITY_TYPE_GRID,
+    ELEMENT_TYPE_GRID,
     CONF_IMPORT_LIMIT,
     CONF_EXPORT_LIMIT,
     CONF_PRICE_IMPORT,
@@ -25,7 +25,7 @@ from ..const import (
     CONF_PRICE_EXPORT_SENSOR,
 )
 from . import (
-    validate_entity_name,
+    validate_element_name,
     validate_positive_number,
     validate_non_negative_number,
 )
@@ -37,7 +37,7 @@ def get_grid_schema() -> vol.Schema:
     """Get the grid configuration schema."""
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): vol.All(str, validate_entity_name),
+            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
             vol.Optional(CONF_IMPORT_LIMIT): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
@@ -91,6 +91,6 @@ def get_grid_schema() -> vol.Schema:
 def create_grid_participant(config: dict[str, Any]) -> dict[str, Any]:
     """Create a grid participant configuration."""
     return {
-        "type": ENTITY_TYPE_GRID,
+        "type": ELEMENT_TYPE_GRID,
         **config,
     }

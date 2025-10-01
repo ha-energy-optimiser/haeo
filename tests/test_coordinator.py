@@ -9,12 +9,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.haeo.coordinator import HaeoDataUpdateCoordinator
 from custom_components.haeo.const import (
     DOMAIN,
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
     OPTIMIZATION_STATUS_SUCCESS,
     OPTIMIZATION_STATUS_FAILED,
-    ATTR_POWER_CONSUMPTION,
-    ATTR_POWER_PRODUCTION,
+    ATTR_POWER,
+    ATTR_ENERGY,
 )
 
 
@@ -28,12 +28,12 @@ def mock_config_entry():
             "name": "Power Network",
             "participants": {
                 "test_battery": {
-                    "type": ENTITY_TYPE_BATTERY,
+                    "type": ELEMENT_TYPE_BATTERY,
                     "capacity": 10000,
                     "initial_charge_percentage": 50,
                 },
                 "test_grid": {
-                    "type": ENTITY_TYPE_GRID,
+                    "type": ELEMENT_TYPE_GRID,
                     "import_limit": 10000,
                     "export_limit": 5000,
                     "price_import": [0.1] * 24,
@@ -70,9 +70,8 @@ async def test_build_network(hass: HomeAssistant, mock_config_entry):
     await coordinator._build_network()
 
     assert coordinator.network is not None
-    assert "test_battery" in coordinator.network.entities
-    assert "test_grid" in coordinator.network.entities
-    assert len(coordinator.network.connections) == 0  # No automatic connections created
+    assert "test_battery" in coordinator.network.elements
+    assert "test_grid" in coordinator.network.elements
 
 
 async def test_get_sensor_forecast_with_forecast_attribute(hass: HomeAssistant, mock_config_entry):
@@ -143,7 +142,7 @@ async def test_build_network_with_battery_sensor(hass: HomeAssistant):
             "name": "Power Network",
             "participants": {
                 "test_battery": {
-                    "type": ENTITY_TYPE_BATTERY,
+                    "type": ELEMENT_TYPE_BATTERY,
                     "capacity": 10000,
                     "initial_charge_percentage": 50,
                     "current_charge_sensor": "sensor.battery_charge",
@@ -181,7 +180,7 @@ async def test_update_data_failure(mock_optimize, hass: HomeAssistant, mock_conf
     assert coordinator.optimization_status == OPTIMIZATION_STATUS_FAILED
 
 
-def test_get_entity_data(hass: HomeAssistant, mock_config_entry):
+def test_get_element_data(hass: HomeAssistant, mock_config_entry):
     """Test getting entity data."""
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
@@ -190,7 +189,7 @@ def test_get_entity_data(hass: HomeAssistant, mock_config_entry):
 
     coordinator.network = Network("test", period=3600, n_periods=3)
     coordinator.network.add(
-        ENTITY_TYPE_BATTERY,
+        ELEMENT_TYPE_BATTERY,
         "test_battery",
         capacity=1000,
         initial_charge_percentage=50,
@@ -201,64 +200,22 @@ def test_get_entity_data(hass: HomeAssistant, mock_config_entry):
     # Run a simple optimization to set variable values
     coordinator.network.optimize()
 
-    result = coordinator.get_entity_data("test_battery")
+    result = coordinator.get_element_data("test_battery")
 
     assert result is not None
-    assert ATTR_POWER_CONSUMPTION in result
-    assert ATTR_POWER_PRODUCTION in result
-    assert "energy" in result
-    assert len(result[ATTR_POWER_CONSUMPTION]) == 3
-    assert len(result[ATTR_POWER_PRODUCTION]) == 3
-    assert len(result["energy"]) == 3
+    assert ATTR_POWER in result
+    assert ATTR_ENERGY in result
+    assert len(result[ATTR_POWER]) == 3
+    assert len(result[ATTR_ENERGY]) == 3
 
 
-def test_get_entity_data_no_result(hass: HomeAssistant, mock_config_entry):
+def test_get_element_data_no_result(hass: HomeAssistant, mock_config_entry):
     """Test getting entity data with no optimization result."""
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
-    result = coordinator.get_entity_data("test_battery")
+    result = coordinator.get_element_data("test_battery")
 
     assert result is None
-
-
-def test_get_connection_data(hass: HomeAssistant, mock_config_entry):
-    """Test getting connection data."""
-    coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
-
-    # Build a network with entities and connections
-    from custom_components.haeo.model import Network
-
-    coordinator.network = Network("test", period=3600, n_periods=3)
-    coordinator.network.add(
-        ENTITY_TYPE_BATTERY,
-        "test_battery",
-        capacity=1000,
-        initial_charge_percentage=50,
-        max_charge_power=100,
-        max_discharge_power=100,
-    )
-    coordinator.network.add(
-        ENTITY_TYPE_GRID,
-        "test_grid",
-        import_limit=1000,
-        export_limit=1000,
-        price_import=[0.1] * 3,
-        price_export=[0.05] * 3,
-    )
-
-    # Connect the entities
-    coordinator.network.connect("test_battery", "test_grid")
-
-    # Run optimization to set variable values
-    coordinator.network.optimize()
-
-    result = coordinator.get_connection_data("test_battery", "test_grid")
-
-    assert result is not None
-    assert len(result) == 3
-    # Verify we get numeric values (optimization results may vary based on solver)
-    assert all(isinstance(val, (int, float)) for val in result)
-    assert all(val >= 0 for val in result)  # Power values should be non-negative
 
 
 def test_last_optimization_properties(hass: HomeAssistant, mock_config_entry):

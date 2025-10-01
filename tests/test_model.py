@@ -2,14 +2,16 @@
 
 import pytest
 from custom_components.haeo.const import (
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
-    ENTITY_TYPE_LOAD,
-    ENTITY_TYPE_GENERATOR,
-    ENTITY_TYPE_NET,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_CONNECTION,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_NET,
 )
 from custom_components.haeo.model import Network
 from custom_components.haeo.model.battery import Battery
+from custom_components.haeo.model.connection import Connection
 from custom_components.haeo.model.grid import Grid
 from custom_components.haeo.model.load import Load
 from custom_components.haeo.model.generator import Generator
@@ -209,8 +211,7 @@ class TestNetwork:
         assert network.name == "test_network"
         assert network.period == 3600
         assert network.n_periods == 24
-        assert len(network.entities) == 0
-        assert len(network.connections) == 0
+        assert len(network.elements) == 0
 
     def test_add_battery(self):
         """Test adding a battery to the network."""
@@ -220,12 +221,12 @@ class TestNetwork:
             n_periods=24,
         )
 
-        battery = network.add(ENTITY_TYPE_BATTERY, "test_battery", capacity=10000, initial_charge_percentage=50)
+        battery = network.add(ELEMENT_TYPE_BATTERY, "test_battery", capacity=10000, initial_charge_percentage=50)
 
         assert isinstance(battery, Battery)
         assert battery.name == "test_battery"
-        assert "test_battery" in network.entities
-        assert network.entities["test_battery"] == battery
+        assert "test_battery" in network.elements
+        assert network.elements["test_battery"] == battery
 
     def test_add_grid(self):
         """Test adding a grid to the network."""
@@ -236,7 +237,7 @@ class TestNetwork:
         )
 
         grid = network.add(
-            ENTITY_TYPE_GRID,
+            ELEMENT_TYPE_GRID,
             "test_grid",
             import_limit=10000,
             export_limit=5000,
@@ -246,7 +247,7 @@ class TestNetwork:
 
         assert isinstance(grid, Grid)
         assert grid.name == "test_grid"
-        assert "test_grid" in network.entities
+        assert "test_grid" in network.elements
 
     def test_add_load(self):
         """Test adding a load to the network."""
@@ -257,14 +258,14 @@ class TestNetwork:
         )
 
         load = network.add(
-            ENTITY_TYPE_LOAD,
+            ELEMENT_TYPE_LOAD,
             "test_load",
             forecast=[1000, 1500, 2000],
         )
 
         assert isinstance(load, Load)
         assert load.name == "test_load"
-        assert "test_load" in network.entities
+        assert "test_load" in network.elements
 
     def test_add_generator(self):
         """Test adding a generator to the network."""
@@ -275,7 +276,7 @@ class TestNetwork:
         )
 
         generator = network.add(
-            ENTITY_TYPE_GENERATOR,
+            ELEMENT_TYPE_GENERATOR,
             "test_generator",
             forecast=[1000, 1500, 2000],
             curtailment=True,
@@ -283,7 +284,7 @@ class TestNetwork:
 
         assert isinstance(generator, Generator)
         assert generator.name == "test_generator"
-        assert "test_generator" in network.entities
+        assert "test_generator" in network.elements
 
     def test_add_net(self):
         """Test adding a net to the network."""
@@ -293,11 +294,11 @@ class TestNetwork:
             n_periods=3,
         )
 
-        net = network.add(ENTITY_TYPE_NET, "test_net")
+        net = network.add(ELEMENT_TYPE_NET, "test_net")
 
         assert isinstance(net, Net)
         assert net.name == "test_net"
-        assert "test_net" in network.entities
+        assert "test_net" in network.elements
 
     def test_connect_entities(self):
         """Test connecting entities in the network."""
@@ -308,9 +309,9 @@ class TestNetwork:
         )
 
         # Add entities
-        network.add(ENTITY_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
+        network.add(ELEMENT_TYPE_BATTERY, "battery1", capacity=10000, initial_charge_percentage=50)
         network.add(
-            ENTITY_TYPE_GRID,
+            ELEMENT_TYPE_GRID,
             "grid1",
             import_limit=10000,
             export_limit=5000,
@@ -319,10 +320,24 @@ class TestNetwork:
         )
 
         # Connect them
-        connection = network.connect("battery1", "grid1", min_power=0, max_power=5000)
+        connection = network.add(
+            ELEMENT_TYPE_CONNECTION,
+            "battery1_to_grid1",
+            source="battery1",
+            target="grid1",
+            min_power=0,
+            max_power=5000,
+        )
 
         assert connection is not None
-        assert ("battery1", "grid1") in network.connections
+        assert connection.name == "battery1_to_grid1"
+        assert connection.source == "battery1"
+        assert connection.target == "grid1"
+        assert len(connection.power) == 3
+        # Check that the connection element was added
+        connection_name = "battery1_to_grid1"
+        assert connection_name in network.elements
+        assert isinstance(network.elements[connection_name], Connection)
         assert len(connection.power) == 3
 
     def test_connect_nonexistent_entities(self):
@@ -332,9 +347,10 @@ class TestNetwork:
             period=3600,
             n_periods=3,
         )
+        network.add(ELEMENT_TYPE_CONNECTION, "bad_connection", source="nonexistent", target="also_nonexistent")
 
-        with pytest.raises(ValueError, match="Source entity 'nonexistent' not found"):
-            network.connect("nonexistent", "also_nonexistent")
+        with pytest.raises(ValueError, match="Source element 'nonexistent' not found"):
+            network.validate()
 
     def test_simple_optimization(self):
         """Test a simple optimization scenario."""
@@ -346,19 +362,19 @@ class TestNetwork:
 
         # Add a simple grid and load
         network.add(
-            ENTITY_TYPE_GRID,
-            ENTITY_TYPE_GRID,
+            ELEMENT_TYPE_GRID,
+            "grid",
             import_limit=10000,
             export_limit=5000,
             price_import=[0.1, 0.2, 0.15],
             price_export=[0.05, 0.08, 0.06],
         )
         network.add("load", "load", forecast=[1000, 1500, 2000])
-        network.add(ENTITY_TYPE_NET, "net")
+        network.add(ELEMENT_TYPE_NET, "net")
 
         # Connect them: grid -> net <- load
-        network.connect("grid", "net")
-        network.connect("net", "load")
+        network.add(ELEMENT_TYPE_CONNECTION, "grid_to_net", source="grid", target="net")
+        network.add(ELEMENT_TYPE_CONNECTION, "net_to_load", source="net", target="load")
 
         # Run optimization
         cost = network.optimize()
@@ -393,13 +409,13 @@ class TestScenarios:
 
         # Add entities
         network.add(
-            ENTITY_TYPE_GENERATOR, "solar", forecast=solar_forecast, curtailment=True, price_production=[0] * 8
+            ELEMENT_TYPE_GENERATOR, "solar", forecast=solar_forecast, curtailment=True, price_production=[0] * 8
         )  # Solar has no fuel cost
 
         network.add("load", "load", forecast=load_forecast)
 
         network.add(
-            ENTITY_TYPE_BATTERY,
+            ELEMENT_TYPE_BATTERY,
             "battery",
             capacity=10000,  # 10 kWh
             initial_charge_percentage=50,
@@ -411,7 +427,7 @@ class TestScenarios:
         )
 
         network.add(
-            ENTITY_TYPE_GRID,
+            ELEMENT_TYPE_GRID,
             "grid",
             import_limit=10000,
             export_limit=10000,
@@ -419,13 +435,13 @@ class TestScenarios:
             price_export=export_prices,
         )
 
-        network.add(ENTITY_TYPE_NET, "net")
+        network.add(ELEMENT_TYPE_NET, "net")
 
         # Connect everything through the net
-        network.connect("solar", "net")
-        network.connect("battery", "net")
-        network.connect("grid", "net")
-        network.connect("net", "load")
+        network.add(ELEMENT_TYPE_CONNECTION, "solar_to_net", source="solar", target="net")
+        network.add(ELEMENT_TYPE_CONNECTION, "battery_to_net", source="battery", target="net")
+        network.add(ELEMENT_TYPE_CONNECTION, "grid_to_net", source="grid", target="net")
+        network.add(ELEMENT_TYPE_CONNECTION, "net_to_load", source="net", target="load")
 
         # Run optimization
         cost = network.optimize()
@@ -434,8 +450,8 @@ class TestScenarios:
         assert isinstance(cost, (int, float))
         assert cost > 0  # Should have some cost
 
-        # Access optimization results directly from entities
-        battery = network.entities["battery"]
+        # Access optimization results directly from elements
+        battery = network.elements["battery"]
 
         from pulp import value
 
@@ -513,7 +529,7 @@ class TestScenarios:
 
         # Add entities
         network.add(
-            ENTITY_TYPE_GENERATOR,
+            ELEMENT_TYPE_GENERATOR,
             "solar",
             forecast=solar_forecast,
             curtailment=True,  # Allow curtailment
@@ -523,20 +539,20 @@ class TestScenarios:
         network.add("load", "load", forecast=load_forecast)
 
         network.add(
-            ENTITY_TYPE_GRID,
-            ENTITY_TYPE_GRID,
+            ELEMENT_TYPE_GRID,
+            "grid",
             import_limit=10000,
             export_limit=10000,
             price_import=import_prices,
             price_export=export_prices,
         )
 
-        network.add(ENTITY_TYPE_NET, "net")
+        network.add(ELEMENT_TYPE_NET, "net")
 
         # Connect entities
-        network.connect("solar", "net")
-        network.connect("grid", "net")
-        network.connect("net", "load")
+        network.add(ELEMENT_TYPE_CONNECTION, "solar_to_net", source="solar", target="net")
+        network.add(ELEMENT_TYPE_CONNECTION, "grid_to_net", source="grid", target="net")
+        network.add(ELEMENT_TYPE_CONNECTION, "net_to_load", source="net", target="load")
 
         # Run optimization
         cost = network.optimize()
@@ -544,8 +560,8 @@ class TestScenarios:
         # Verify solution
         assert isinstance(cost, (int, float))
 
-        # Access optimization results directly from entities
-        solar = network.entities["solar"]
+        # Access optimization results directly from elements
+        solar = network.elements["solar"]
 
         from pulp import value
 

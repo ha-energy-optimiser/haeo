@@ -10,12 +10,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.haeo import async_setup_entry, async_unload_entry
 from custom_components.haeo.const import (
     DOMAIN,
-    CONF_ENTITIES,
-    CONF_CONNECTIONS,
-    CONF_ENTITY_TYPE,
-    CONF_ENTITY_CONFIG,
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
+    CONF_ELEMENTS,
+    CONF_ELEMENT_TYPE,
+    CONF_ELEMENT_CONFIG,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_CONNECTION,
 )
 
 
@@ -25,32 +25,34 @@ def mock_config_entry():
     return MockConfigEntry(
         domain=DOMAIN,
         data={
-            CONF_ENTITIES: [
+            CONF_ELEMENTS: [
                 {
                     CONF_NAME: "test_battery",
-                    CONF_ENTITY_TYPE: ENTITY_TYPE_BATTERY,
-                    CONF_ENTITY_CONFIG: {
+                    CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY,
+                    CONF_ELEMENT_CONFIG: {
                         "capacity": 10000,
                         "initial_charge_percentage": 50,
                     },
                 },
                 {
                     CONF_NAME: "test_grid",
-                    CONF_ENTITY_TYPE: ENTITY_TYPE_GRID,
-                    CONF_ENTITY_CONFIG: {
+                    CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
+                    CONF_ELEMENT_CONFIG: {
                         "import_limit": 10000,
                         "export_limit": 5000,
                         "price_import": [0.1, 0.2, 0.15],
                         "price_export": [0.05, 0.08, 0.06],
                     },
                 },
-            ],
-            CONF_CONNECTIONS: [
                 {
-                    "source": "test_battery",
-                    "target": "test_grid",
-                    "max_power": 5000,
-                }
+                    CONF_NAME: "test_load",
+                    CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION,
+                    CONF_ELEMENT_CONFIG: {
+                        "source": "test_battery",
+                        "target": "test_grid",
+                        "max_power": 5000,
+                    },
+                },
             ],
         },
         entry_id="test_entry_id",

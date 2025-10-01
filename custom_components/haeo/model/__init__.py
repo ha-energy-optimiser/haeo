@@ -1,2 +1,2 @@
-from .entity import Entity as Entity
+from .element import Element as Element
 from .network import Network as Network

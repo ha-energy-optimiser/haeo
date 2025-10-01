@@ -21,16 +21,15 @@ from ..const import (
     CONF_TARGET,
     CONF_MIN_POWER,
     CONF_MAX_POWER,
+    ELEMENT_TYPE_CONNECTION,
 )
 from . import (
-    validate_entity_name,
+    validate_element_name,
     validate_positive_number,
     validate_non_negative_number,
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-ENTITY_TYPE_CONNECTION = "connection"
 
 
 def get_connection_schema(participants: dict[str, Any]) -> vol.Schema:
@@ -39,7 +38,7 @@ def get_connection_schema(participants: dict[str, Any]) -> vol.Schema:
 
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): vol.All(str, validate_entity_name),
+            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
             vol.Required(CONF_SOURCE): SelectSelector(
                 SelectSelectorConfig(
                     options=participant_options,
@@ -98,6 +97,6 @@ def validate_connection_config(config: dict[str, Any]) -> dict[str, str]:
 def create_connection_participant(config: dict[str, Any]) -> dict[str, Any]:
     """Create a connection participant configuration."""
     return {
-        "type": ENTITY_TYPE_CONNECTION,
+        "type": ELEMENT_TYPE_CONNECTION,
         **config,
     }

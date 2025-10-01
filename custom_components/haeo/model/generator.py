@@ -2,10 +2,10 @@ from typing import Sequence
 import numpy as np
 from pulp import LpVariable
 
-from .entity import Entity
+from .element import Element
 
 
-class Generator(Entity):
+class Generator(Element):
     """Generator entity for electrical system modeling."""
 
     def __init__(

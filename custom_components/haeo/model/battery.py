@@ -1,10 +1,10 @@
 import numpy as np
 from pulp import LpVariable
 
-from .entity import Entity
+from .element import Element
 
 
-class Battery(Entity):
+class Battery(Element):
     """Battery entity for electrical system modeling."""
 
     def __init__(

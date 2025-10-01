@@ -4,7 +4,7 @@ from pulp import LpVariable, LpConstraint, lpSum
 
 
 @dataclass
-class Entity:
+class Element:
     """Generic electrical entity which models the relationship between power and energy."""
 
     # Name of the entity

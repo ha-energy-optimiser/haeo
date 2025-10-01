@@ -2,25 +2,25 @@
   "config": {
     "step": {
       "user": {
-        "title": "HAEO Hub Setup",
-        "description": "Create a new HAEO optimization hub. After creating the hub, you can add individual devices like batteries, grid connections, loads, and generators through the hub's configuration options.",
+        "title": "HAEO Network Setup",
+        "description": "Create a new HAEO optimization network. After creating the network, you can add individual devices like batteries, grid connections, loads, and generators through the network's configuration options.",
         "data": {
-          "name": "Hub Name"
+          "name": "Network Name"
         }
       }
     },
     "error": {
-      "name_exists": "A hub with this name already exists"
+      "name_exists": "A network with this name already exists"
     },
     "abort": {
-      "already_configured": "Hub already configured"
+      "already_configured": "Network already configured"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "HAEO Hub Configuration",
-        "description": "Manage your HAEO hub and its connected devices",
+        "title": "HAEO Network Configuration",
+        "description": "Manage your HAEO network and its connected devices",
         "menu_options": {
           "add_participant": "Add Device",
           "manage_participants": "View Devices",
@@ -29,18 +29,18 @@
       },
       "add_participant": {
         "title": "Add Device",
-        "description": "Choose the type of device to add to your HAEO hub",
+        "description": "Choose the type of device to add to your HAEO network",
         "data": {
           "participant_type": "Device Type"
         }
       },
       "manage_participants": {
         "title": "Connected Devices",
-        "description": "Current devices connected to this hub:\n{participants}"
+        "description": "Select a device to manage"
       },
       "remove_participant": {
         "title": "Remove Device",
-        "description": "Select a device to remove from the hub",
+        "description": "Select a device to remove from the network",
         "data": {
           "participant": "Device to Remove"
         }
@@ -108,7 +108,7 @@
       "invalid_name": "Invalid device name"
     },
     "abort": {
-      "no_participants": "No devices are currently connected to this hub"
+      "no_participants": "No devices are currently connected to this network"
     }
   }
 }

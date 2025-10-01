@@ -10,7 +10,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 
 from ..const import DOMAIN
-from . import validate_entity_name
+from . import validate_element_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Show form
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_NAME): vol.All(str, validate_entity_name),
+                vol.Required(CONF_NAME): vol.All(str, validate_element_name),
             }
         )
 

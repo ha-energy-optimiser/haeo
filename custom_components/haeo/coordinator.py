@@ -12,11 +12,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ATTR_POWER,
     DOMAIN,
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
-    ENTITY_TYPE_GENERATOR,
-    ENTITY_TYPE_LOAD,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_LOAD,
     CONF_SENSORS,
     CONF_SENSOR_ENTITY_ID,
     CONF_SENSOR_ATTRIBUTE,
@@ -27,8 +28,6 @@ from .const import (
     CONF_PRICE_IMPORT_SENSOR,
     CONF_PRICE_EXPORT_SENSOR,
     CONF_FORECAST_SENSORS,
-    ATTR_POWER_CONSUMPTION,
-    ATTR_POWER_PRODUCTION,
     DEFAULT_PERIOD,
     DEFAULT_N_PERIODS,
     DEFAULT_UPDATE_INTERVAL,
@@ -117,54 +116,54 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         # Add entities from participants
-        for entity_name, entity_config in participants.items():
-            entity_type = entity_config["type"]
-            entity_params = entity_config.copy()
-            entity_params.pop("type", None)  # Remove type key as it's not a constructor parameter
+        for element_name, element_config in participants.items():
+            element_type = element_config["type"]
+            element_params = element_config.copy()
+            element_params.pop("type", None)  # Remove type key as it's not a constructor parameter
 
-            _LOGGER.debug("Adding entity: %s (%s)", entity_name, entity_type)
+            _LOGGER.debug("Adding element: %s (%s)", element_name, element_type)
 
             try:
                 # Handle battery entities - use current charge from sensor
-                if entity_type == ENTITY_TYPE_BATTERY:
-                    if CONF_CURRENT_CHARGE_SENSOR in entity_params:
-                        current_charge_sensor = entity_params[CONF_CURRENT_CHARGE_SENSOR]
+                if element_type == ELEMENT_TYPE_BATTERY:
+                    if CONF_CURRENT_CHARGE_SENSOR in element_params:
+                        current_charge_sensor = element_params[CONF_CURRENT_CHARGE_SENSOR]
                         current_charge = await self._get_sensor_value(current_charge_sensor)
                         if current_charge is not None:
                             # Update initial charge percentage from sensor
-                            entity_params[CONF_INITIAL_CHARGE_PERCENTAGE] = current_charge
+                            element_params[CONF_INITIAL_CHARGE_PERCENTAGE] = current_charge
                         # Remove the sensor from params as it's not a Battery constructor parameter
-                        entity_params.pop(CONF_CURRENT_CHARGE_SENSOR, None)
+                        element_params.pop(CONF_CURRENT_CHARGE_SENSOR, None)
 
                 # Handle grid entities - need price arrays
-                if entity_type == ENTITY_TYPE_GRID:
+                if element_type == ELEMENT_TYPE_GRID:
                     # Handle pricing from sensors or constants
                     import_price_array = None
                     export_price_array = None
 
                     # Check for sensor-based pricing
-                    if CONF_PRICE_IMPORT_SENSOR in entity_params:
-                        import_price_data = await self._get_sensor_forecast(entity_params[CONF_PRICE_IMPORT_SENSOR])
+                    if CONF_PRICE_IMPORT_SENSOR in element_params:
+                        import_price_data = await self._get_sensor_forecast(element_params[CONF_PRICE_IMPORT_SENSOR])
                         if import_price_data:
                             import_price_array = import_price_data
                         # Remove sensor from params as it's not a Grid constructor parameter
-                        entity_params.pop(CONF_PRICE_IMPORT_SENSOR, None)
+                        element_params.pop(CONF_PRICE_IMPORT_SENSOR, None)
 
-                    if CONF_PRICE_EXPORT_SENSOR in entity_params:
-                        export_price_data = await self._get_sensor_forecast(entity_params[CONF_PRICE_EXPORT_SENSOR])
+                    if CONF_PRICE_EXPORT_SENSOR in element_params:
+                        export_price_data = await self._get_sensor_forecast(element_params[CONF_PRICE_EXPORT_SENSOR])
                         if export_price_data:
                             export_price_array = export_price_data
                         # Remove sensor from params as it's not a Grid constructor parameter
-                        entity_params.pop(CONF_PRICE_EXPORT_SENSOR, None)
+                        element_params.pop(CONF_PRICE_EXPORT_SENSOR, None)
 
                     # Check for constant pricing
-                    if CONF_PRICE_IMPORT in entity_params:
-                        constant_import = entity_params.pop(CONF_PRICE_IMPORT)
+                    if CONF_PRICE_IMPORT in element_params:
+                        constant_import = element_params.pop(CONF_PRICE_IMPORT)
                         if import_price_array is None:  # Only use constant if no sensor data
                             import_price_array = [constant_import] * DEFAULT_N_PERIODS
 
-                    if CONF_PRICE_EXPORT in entity_params:
-                        constant_export = entity_params.pop(CONF_PRICE_EXPORT)
+                    if CONF_PRICE_EXPORT in element_params:
+                        constant_export = element_params.pop(CONF_PRICE_EXPORT)
                         if export_price_array is None:  # Only use constant if no sensor data
                             export_price_array = [constant_export] * DEFAULT_N_PERIODS
 
@@ -175,12 +174,12 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         export_price_array = [0.0] * DEFAULT_N_PERIODS
 
                     # Set the price arrays for grid constructor
-                    entity_params["price_import"] = import_price_array
-                    entity_params["price_export"] = export_price_array
+                    element_params["price_import"] = import_price_array
+                    element_params["price_export"] = export_price_array
 
-                self.network.add(entity_type, entity_name, **entity_params)
+                self.network.add(element_type, element_name, **element_params)
             except Exception as ex:
-                _LOGGER.error("Failed to add entity %s: %s", entity_name, ex)
+                _LOGGER.error("Failed to add element %s: %s", element_name, ex)
                 raise
 
     async def _collect_sensor_data(self) -> None:
@@ -191,27 +190,27 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Get participants from hub configuration
         participants = self.config.get("participants", {})
 
-        for entity_name, entity_config in participants.items():
-            entity_type = entity_config["type"]
+        for element_name, element_config in participants.items():
+            element_type = element_config["type"]
 
             # Update dynamic sensor data for all entity types with forecast/price sensors
-            if entity_type == ENTITY_TYPE_GRID:
+            if element_type == ELEMENT_TYPE_GRID:
                 # Update price data from sensors for grid entities
-                if CONF_PRICE_IMPORT_SENSOR in entity_config:
-                    price_import_data = await self._get_sensor_forecast(entity_config[CONF_PRICE_IMPORT_SENSOR])
+                if CONF_PRICE_IMPORT_SENSOR in element_config:
+                    price_import_data = await self._get_sensor_forecast(element_config[CONF_PRICE_IMPORT_SENSOR])
                     if price_import_data:
-                        entity = self.network.entities[entity_name]
-                        entity.price_production = price_import_data
+                        element = self.network.elements[element_name]
+                        element.price_production = price_import_data
 
-                if CONF_PRICE_EXPORT_SENSOR in entity_config:
-                    price_export_data = await self._get_sensor_forecast(entity_config[CONF_PRICE_EXPORT_SENSOR])
+                if CONF_PRICE_EXPORT_SENSOR in element_config:
+                    price_export_data = await self._get_sensor_forecast(element_config[CONF_PRICE_EXPORT_SENSOR])
                     if price_export_data:
-                        entity = self.network.entities[entity_name]
-                        entity.price_consumption = price_export_data
+                        element = self.network.elements[element_name]
+                        element.price_consumption = price_export_data
 
-            elif entity_type in [ENTITY_TYPE_GENERATOR, ENTITY_TYPE_LOAD]:
+            elif element_type in [ELEMENT_TYPE_GENERATOR, ELEMENT_TYPE_LOAD]:
                 # Update forecast data from sensors
-                forecast_sensors = entity_config.get(CONF_FORECAST_SENSORS, [])
+                forecast_sensors = element_config.get(CONF_FORECAST_SENSORS, [])
                 if forecast_sensors:
                     # Get forecast data from all sensors
                     forecast_data = [
@@ -222,22 +221,22 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
                     if forecast_data:
                         # Use the first sensor's data
-                        entity = self.network.entities[entity_name]
-                        entity.forecast = forecast_data[0]
+                        element = self.network.elements[element_name]
+                        element.forecast = forecast_data[0]
 
             # Update data from configured sensors
-            if CONF_SENSORS in entity_config:
-                for sensor_config in entity_config[CONF_SENSORS]:
+            if CONF_SENSORS in element_config:
+                for sensor_config in element_config[CONF_SENSORS]:
                     sensor_data = await self._get_sensor_data(sensor_config)
                     if sensor_data:
-                        # Process sensor data based on entity type and sensor configuration
-                        await self._process_sensor_data(entity_name, entity_type, sensor_config, sensor_data)
+                        # Process sensor data based on element type and sensor configuration
+                        await self._process_sensor_data(element_name, element_type, sensor_config, sensor_data)
 
-    async def _get_sensor_forecast(self, entity_id: str) -> list[float] | None:
+    async def _get_sensor_forecast(self, element_id: str) -> list[float] | None:
         """Get forecast data from a sensor entity."""
-        state = self.hass.states.get(entity_id)
+        state = self.hass.states.get(element_id)
         if not state:
-            _LOGGER.warning("Sensor %s not found", entity_id)
+            _LOGGER.warning("Sensor %s not found", element_id)
             return None
 
         # Try to get forecast from attributes first
@@ -246,19 +245,19 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 return [float(x) for x in forecast_attr[:DEFAULT_N_PERIODS]]
             except (ValueError, TypeError) as ex:
-                _LOGGER.error("Invalid forecast data in sensor %s: %s", entity_id, ex)
+                _LOGGER.error("Invalid forecast data in sensor %s: %s", element_id, ex)
 
         # Fallback: repeat current state value
-        return self._get_repeated_value(state, entity_id)
+        return self._get_repeated_value(state, element_id)
 
     async def _get_sensor_data(self, sensor_config: dict[str, Any]) -> Any | None:
         """Get data from a sensor entity."""
-        entity_id = sensor_config[CONF_SENSOR_ENTITY_ID]
+        element_id = sensor_config[CONF_SENSOR_ENTITY_ID]
         attribute = sensor_config.get(CONF_SENSOR_ATTRIBUTE)
 
-        state = self.hass.states.get(entity_id)
+        state = self.hass.states.get(element_id)
         if not state:
-            _LOGGER.warning("Sensor %s not found", entity_id)
+            _LOGGER.warning("Sensor %s not found", element_id)
             return None
 
         if attribute:
@@ -266,42 +265,42 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             return state.state
 
-    def _get_repeated_value(self, state, entity_id: str) -> list[float] | None:
+    def _get_repeated_value(self, state, element_id: str) -> list[float] | None:
         """Get repeated current state value for forecast periods."""
         try:
             current_value = float(state.state)
             return [current_value] * DEFAULT_N_PERIODS
         except (ValueError, TypeError) as ex:
-            _LOGGER.error("Invalid state value in sensor %s: %s", entity_id, ex)
+            _LOGGER.error("Invalid state value in sensor %s: %s", element_id, ex)
             return None
 
-    async def _get_sensor_value(self, entity_id: str) -> float | None:
+    async def _get_sensor_value(self, element_id: str) -> float | None:
         """Get current numeric value from a sensor entity."""
-        state = self.hass.states.get(entity_id)
+        state = self.hass.states.get(element_id)
         if not state:
-            _LOGGER.warning("Sensor %s not found", entity_id)
+            _LOGGER.warning("Sensor %s not found", element_id)
             return None
 
         try:
             return float(state.state)
         except (ValueError, TypeError) as ex:
-            _LOGGER.error("Invalid numeric value in sensor %s: %s", entity_id, ex)
+            _LOGGER.error("Invalid numeric value in sensor %s: %s", element_id, ex)
             return None
 
     async def _process_sensor_data(
-        self, entity_name: str, entity_type: str, sensor_config: dict[str, Any], sensor_data: Any
+        self, element_name: str, element_type: str, sensor_config: dict[str, Any], sensor_data: Any
     ) -> None:
         """Process sensor data and update entity accordingly."""
         # This method can be extended to handle specific sensor data processing
         # For now, we'll log the data for debugging
-        _LOGGER.debug("Received sensor data for entity %s (%s): %s", entity_name, entity_type, sensor_data)
+        _LOGGER.debug("Received sensor data for entity %s (%s): %s", element_name, element_type, sensor_data)
 
     def _run_optimization(self) -> float:
         """Run the optimization process."""
         if not self.network:
             raise RuntimeError("Network not initialized")
 
-        _LOGGER.debug("Running optimization for network with %d entities", len(self.network.entities))
+        _LOGGER.debug("Running optimization for network with %d elements", len(self.network.elements))
 
         try:
             return self.network.optimize()
@@ -309,15 +308,15 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("Optimization failed: %s", ex)
             raise
 
-    def get_entity_data(self, entity_name: str) -> dict[str, Any] | None:
-        """Get data for a specific entity directly from the network."""
-        if not self.network or entity_name not in self.network.entities:
+    def get_element_data(self, element_name: str) -> dict[str, Any] | None:
+        """Get data for a specific element directly from the network."""
+        if not self.network or element_name not in self.network.elements:
             return None
 
         from pulp import value
 
-        entity = self.network.entities[entity_name]
-        entity_data = {}
+        element = self.network.elements[element_name]
+        element_data = {}
 
         # Helper to extract values safely
         def extract_values(variables):
@@ -327,38 +326,25 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 result.append(float(val) if isinstance(val, (int, float)) else 0.0)
             return result
 
-        # Get power consumption/production/energy values
-        if entity.power_consumption is not None:
-            entity_data[ATTR_POWER_CONSUMPTION] = extract_values(entity.power_consumption)
+        # Get power values (net power, can be positive or negative)
+        if hasattr(element, "power") and element.power is not None:
+            # Connections have a single power attribute (net flow)
+            element_data[ATTR_POWER] = extract_values(element.power)
+        elif hasattr(element, "power_consumption") and element.power_consumption is not None:
+            # Elements like batteries have separate consumption and production
+            consumption = extract_values(element.power_consumption)
+            production = (
+                extract_values(element.power_production)
+                if hasattr(element, "power_production") and element.power_production is not None
+                else [0.0] * len(consumption)
+            )
+            # Net power = production - consumption (positive = net production, negative = net consumption)
+            element_data[ATTR_POWER] = [p - c for p, c in zip(production, consumption)]
 
-        if entity.power_production is not None:
-            entity_data[ATTR_POWER_PRODUCTION] = extract_values(entity.power_production)
+        if hasattr(element, "energy") and element.energy is not None:
+            element_data["energy"] = extract_values(element.energy)
 
-        if entity.energy is not None:
-            entity_data["energy"] = extract_values(entity.energy)
-
-        return entity_data if entity_data else None
-
-    def get_connection_data(self, source: str, target: str) -> list[float] | None:
-        """Get data for a specific connection directly from the network."""
-        if not self.network:
-            return None
-
-        connection_key = (source, target)
-        if connection_key not in self.network.connections:
-            return None
-
-        from pulp import value
-
-        connection = self.network.connections[connection_key]
-        power_values = []
-        for var in connection.power:
-            val = value(var)
-            if isinstance(val, (int, float)):
-                power_values.append(float(val))
-            else:
-                power_values.append(0.0)
-        return power_values
+        return element_data if element_data else None
 
     @property
     def last_optimization_cost(self) -> float | None:

@@ -16,7 +16,7 @@ from homeassistant.helpers.selector import (
 )
 
 from ..const import (
-    ENTITY_TYPE_BATTERY,
+    ELEMENT_TYPE_BATTERY,
     CONF_CAPACITY,
     CONF_CURRENT_CHARGE_SENSOR,
     CONF_MIN_CHARGE_PERCENTAGE,
@@ -28,7 +28,7 @@ from ..const import (
     CONF_DISCHARGE_COST,
 )
 from . import (
-    validate_entity_name,
+    validate_element_name,
     validate_positive_number,
     validate_percentage,
     validate_efficiency,
@@ -42,7 +42,7 @@ def get_battery_schema() -> vol.Schema:
     """Get the battery configuration schema."""
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): vol.All(str, validate_entity_name),
+            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
             vol.Required(CONF_CAPACITY): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
@@ -141,6 +141,6 @@ def get_battery_schema() -> vol.Schema:
 def create_battery_participant(config: dict[str, Any]) -> dict[str, Any]:
     """Create a battery participant configuration."""
     return {
-        "type": ENTITY_TYPE_BATTERY,
+        "type": ELEMENT_TYPE_BATTERY,
         **config,
     }

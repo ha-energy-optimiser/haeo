@@ -9,7 +9,7 @@ from custom_components.haeo.flows.battery import (
     create_battery_participant,
 )
 from custom_components.haeo.const import (
-    ENTITY_TYPE_BATTERY,
+    ELEMENT_TYPE_BATTERY,
     CONF_CAPACITY,
     CONF_CURRENT_CHARGE_SENSOR,
     CONF_MIN_CHARGE_PERCENTAGE,
@@ -145,7 +145,7 @@ async def test_battery_participant_creation(
     """Test battery participant creation with various configurations."""
     participant = create_battery_participant(battery_data)
 
-    assert participant["type"] == ENTITY_TYPE_BATTERY
+    assert participant["type"] == ELEMENT_TYPE_BATTERY
     assert participant[CONF_CAPACITY] == battery_data[CONF_CAPACITY]
     assert participant[CONF_CURRENT_CHARGE_SENSOR] == battery_data[CONF_CURRENT_CHARGE_SENSOR]
 
@@ -165,7 +165,7 @@ async def test_battery_participant_with_defaults(hass: HomeAssistant):
 
     participant = create_battery_participant(minimal_config)
 
-    assert participant["type"] == ENTITY_TYPE_BATTERY
+    assert participant["type"] == ELEMENT_TYPE_BATTERY
     assert participant[CONF_CAPACITY] == 5000
     assert participant[CONF_CURRENT_CHARGE_SENSOR] == "sensor.battery_level"
     assert participant[CONF_MAX_CHARGE_POWER] == 2000

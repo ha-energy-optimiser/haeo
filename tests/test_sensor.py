@@ -9,26 +9,23 @@ from homeassistant.config_entries import ConfigEntry
 
 from custom_components.haeo.const import (
     DOMAIN,
-    CONF_ENTITIES,
-    CONF_CONNECTIONS,
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
+    CONF_ELEMENTS,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_CONNECTION,
+    ELEMENT_TYPE_GRID,
     OPTIMIZATION_STATUS_SUCCESS,
     OPTIMIZATION_STATUS_FAILED,
     UNIT_CURRENCY,
-    ATTR_POWER_CONSUMPTION,
-    ATTR_POWER_PRODUCTION,
+    ATTR_POWER,
+    ATTR_ENERGY,
 )
 from custom_components.haeo.sensor import (
     async_setup_entry,
     HaeoSensorBase,
     HaeoOptimizationCostSensor,
     HaeoOptimizationStatusSensor,
-    HaeoEntityPowerConsumptionSensor,
-    HaeoEntityPowerProductionSensor,
-    HaeoEntityNetPowerSensor,
-    HaeoEntityEnergySensor,
-    HaeoConnectionPowerSensor,
+    HaeoElementPowerSensor,
+    HaeoElementEnergySensor,
 )
 from custom_components.haeo.coordinator import HaeoDataUpdateCoordinator
 
@@ -43,19 +40,14 @@ def mock_coordinator():
     coordinator.last_optimization_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     coordinator.optimization_result = {
         "solution": {
-            "test_battery_power_consumption": [100.0, 150.0, 200.0],
-            "test_battery_power_production": [50.0, 75.0, 100.0],
-            "test_battery_power": [50.0, 75.0, 100.0],
+            "test_battery_power": [50.0, 75.0, 100.0],  # Battery transporting power
             "test_battery_energy": [500.0, 600.0, 700.0],
         }
     }
-    coordinator.get_entity_data.return_value = {
-        ATTR_POWER_CONSUMPTION: [100.0, 150.0, 200.0],
-        ATTR_POWER_PRODUCTION: [50.0, 75.0, 100.0],
-        "power": [50.0, 75.0, 100.0],
-        "energy": [500.0, 600.0, 700.0],
+    coordinator.get_element_data.return_value = {
+        ATTR_POWER: [-50.0, -75.0, -100.0],  # Net power (negative = consuming)
+        ATTR_ENERGY: [500.0, 600.0, 700.0],
     }
-    coordinator.get_connection_data.return_value = [75.0, 125.0, 175.0]
     coordinator.get_future_timestamps.return_value = [
         datetime(2024, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
         datetime(2024, 1, 1, 14, 0, 0, tzinfo=timezone.utc),
@@ -71,12 +63,10 @@ def mock_config_entry():
         spec=ConfigEntry,
         entry_id="test_entry",
         data={
-            CONF_ENTITIES: [
-                {"name": "test_battery", "type": ENTITY_TYPE_BATTERY},
-                {"name": "test_grid", "type": ENTITY_TYPE_GRID},
-            ],
-            CONF_CONNECTIONS: [
-                {"source": "test_battery", "target": "test_grid"},
+            CONF_ELEMENTS: [
+                {"name": "test_battery", "type": ELEMENT_TYPE_BATTERY},
+                {"name": "test_grid", "type": ELEMENT_TYPE_GRID},
+                {"name": "test_connection", "type": ELEMENT_TYPE_CONNECTION},
             ],
         },
     )
@@ -130,7 +120,7 @@ class TestHaeoSensorBase:
 
         assert device_info is not None
         assert device_info.get("identifiers") == {(DOMAIN, mock_config_entry.entry_id)}
-        assert device_info.get("name") == "HAEO Energy Optimizer"
+        assert device_info.get("name") == "HAEO Energy Optimization Network"
         assert device_info.get("manufacturer") == "HAEO"
 
     def test_available_success(self, mock_coordinator, mock_config_entry):
@@ -233,130 +223,57 @@ class TestHaeoOptimizationStatusSensor:
         assert attrs["last_cost"] == 15.50
 
 
-class TestHaeoEntityPowerConsumptionSensor:
+class TestHaeoElementPowerSensor:
     """Test the entity power consumption sensor."""
 
     def test_init(self, mock_coordinator, mock_config_entry):
         """Test sensor initialization."""
-        sensor = HaeoEntityPowerConsumptionSensor(mock_coordinator, mock_config_entry, "test_battery")
+        sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
 
-        assert sensor.entity_name == "test_battery"
-        assert sensor._attr_name == "HAEO test_battery Power Consumption"
-        assert sensor._attr_unique_id == f"{mock_config_entry.entry_id}_test_battery_power_consumption"
+        assert sensor.element_name == "test_battery"
+        assert sensor._attr_name == "HAEO test_battery Power"
+        assert sensor._attr_unique_id == f"{mock_config_entry.entry_id}_test_battery_power"
 
     def test_native_value(self, mock_coordinator, mock_config_entry):
         """Test native value property."""
-        sensor = HaeoEntityPowerConsumptionSensor(mock_coordinator, mock_config_entry, "test_battery")
-        assert sensor.native_value == 100.0
+        sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
+        assert sensor.native_value == -50.0  # Net power: 0 production - 50 consumption = -50
 
     def test_native_value_no_data(self, mock_coordinator, mock_config_entry):
         """Test native value when no data available."""
-        mock_coordinator.get_entity_data.return_value = None
-        sensor = HaeoEntityPowerConsumptionSensor(mock_coordinator, mock_config_entry, "test_battery")
+        mock_coordinator.get_element_data.return_value = None
+        sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
         assert sensor.native_value is None
 
     def test_native_value_empty_data(self, mock_coordinator, mock_config_entry):
         """Test native value when data is empty."""
-        mock_coordinator.get_entity_data.return_value = {ATTR_POWER_CONSUMPTION: []}
-        sensor = HaeoEntityPowerConsumptionSensor(mock_coordinator, mock_config_entry, "test_battery")
+        mock_coordinator.get_element_data.return_value = {ATTR_POWER: []}
+        sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
         assert sensor.native_value is None
 
     def test_extra_state_attributes(self, mock_coordinator, mock_config_entry):
         """Test extra state attributes."""
-        sensor = HaeoEntityPowerConsumptionSensor(mock_coordinator, mock_config_entry, "test_battery")
+        sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
         attrs = sensor.extra_state_attributes
 
         assert attrs is not None
-        assert attrs["forecast"] == [100.0, 150.0, 200.0]
+        assert attrs["forecast"] == [-50.0, -75.0, -100.0]  # Net power forecast
         assert "timestamped_forecast" in attrs
         assert len(attrs["timestamped_forecast"]) == 3
-        assert attrs["timestamped_forecast"][0]["value"] == 100.0
+        assert attrs["timestamped_forecast"][0]["value"] == -50.0
 
 
-class TestHaeoEntityPowerProductionSensor:
-    """Test the entity power production sensor."""
-
-    def test_init(self, mock_coordinator, mock_config_entry):
-        """Test sensor initialization."""
-        sensor = HaeoEntityPowerProductionSensor(mock_coordinator, mock_config_entry, "test_battery")
-
-        assert sensor.entity_name == "test_battery"
-        assert sensor._attr_name == "HAEO test_battery Power Production"
-
-    def test_native_value(self, mock_coordinator, mock_config_entry):
-        """Test native value property."""
-        sensor = HaeoEntityPowerProductionSensor(mock_coordinator, mock_config_entry, "test_battery")
-        assert sensor.native_value == 50.0
-
-
-class TestHaeoEntityNetPowerSensor:
-    """Test the entity net power sensor."""
-
-    def test_init(self, mock_coordinator, mock_config_entry):
-        """Test sensor initialization."""
-        sensor = HaeoEntityNetPowerSensor(mock_coordinator, mock_config_entry, "test_battery")
-
-        assert sensor.entity_name == "test_battery"
-        assert sensor._attr_name == "HAEO test_battery Net Power"
-
-    def test_native_value(self, mock_coordinator, mock_config_entry):
-        """Test native value property."""
-        sensor = HaeoEntityNetPowerSensor(mock_coordinator, mock_config_entry, "test_battery")
-        assert sensor.native_value == 50.0
-
-
-class TestHaeoEntityEnergySensor:
+class TestHaeoElementEnergySensor:
     """Test the entity energy sensor."""
 
     def test_init(self, mock_coordinator, mock_config_entry):
         """Test sensor initialization."""
-        sensor = HaeoEntityEnergySensor(mock_coordinator, mock_config_entry, "test_battery")
+        sensor = HaeoElementEnergySensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
 
-        assert sensor.entity_name == "test_battery"
+        assert sensor.element_name == "test_battery"
         assert sensor._attr_name == "HAEO test_battery Energy"
 
     def test_native_value(self, mock_coordinator, mock_config_entry):
         """Test native value property."""
-        sensor = HaeoEntityEnergySensor(mock_coordinator, mock_config_entry, "test_battery")
+        sensor = HaeoElementEnergySensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
         assert sensor.native_value == 500.0
-
-
-class TestHaeoConnectionPowerSensor:
-    """Test the connection power sensor."""
-
-    def test_init(self, mock_coordinator, mock_config_entry):
-        """Test sensor initialization."""
-        sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
-
-        assert sensor.source == "test_battery"
-        assert sensor.target == "test_grid"
-        assert sensor._attr_name == "HAEO test_battery to test_grid Power Flow"
-
-    def test_native_value(self, mock_coordinator, mock_config_entry):
-        """Test native value property."""
-        sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
-        assert sensor.native_value == 75.0
-
-    def test_native_value_no_data(self, mock_coordinator, mock_config_entry):
-        """Test native value when no connection data available."""
-        mock_coordinator.get_connection_data.return_value = None
-        sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
-        assert sensor.native_value is None
-
-    def test_native_value_empty_data(self, mock_coordinator, mock_config_entry):
-        """Test native value when connection data is empty."""
-        mock_coordinator.get_connection_data.return_value = []
-        sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
-        assert sensor.native_value is None
-
-    def test_handle_coordinator_update(self, mock_coordinator, mock_config_entry, hass):
-        """Test handling coordinator updates."""
-        sensor = HaeoConnectionPowerSensor(mock_coordinator, mock_config_entry, "test_battery", "test_grid")
-        sensor.hass = hass  # Set hass attribute for the sensor
-        sensor.entity_id = "sensor.test_battery_to_test_grid_power_flow"  # Set entity_id
-
-        # Test with optimization data
-        sensor._handle_coordinator_update()
-        assert sensor.native_value == 75.0  # Should get connection data
-        assert "last_optimization" in sensor.extra_state_attributes
-        assert sensor.extra_state_attributes["optimization_status"] == OPTIMIZATION_STATUS_SUCCESS

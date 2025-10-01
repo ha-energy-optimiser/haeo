@@ -4,29 +4,30 @@
 DOMAIN = "haeo"
 
 # Configuration keys
-CONF_ENTITIES = "entities"
-CONF_CONNECTIONS = "connections"
-CONF_ENTITY_TYPE = "entity_type"
-CONF_ENTITY_CONFIG = "config"
+CONF_ELEMENTS = "elements"
+CONF_ELEMENT_TYPE = "element_type"
+CONF_ELEMENT_CONFIG = "config"
 CONF_NAME = "name"
 CONF_SOURCE = "source"
 CONF_TARGET = "target"
 CONF_MIN_POWER = "min_power"
 CONF_MAX_POWER = "max_power"
 
-# Entity types
-ENTITY_TYPE_BATTERY = "battery"
-ENTITY_TYPE_GRID = "grid"
-ENTITY_TYPE_LOAD = "load"
-ENTITY_TYPE_GENERATOR = "generator"
-ENTITY_TYPE_NET = "net"
+# Component types
+ELEMENT_TYPE_BATTERY = "battery"
+ELEMENT_TYPE_CONNECTION = "connection"
+ELEMENT_TYPE_GRID = "grid"
+ELEMENT_TYPE_LOAD = "load"
+ELEMENT_TYPE_GENERATOR = "generator"
+ELEMENT_TYPE_NET = "net"
 
-ENTITY_TYPES = [
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
-    ENTITY_TYPE_LOAD,
-    ENTITY_TYPE_GENERATOR,
-    ENTITY_TYPE_NET,
+ELEMENT_TYPES = [
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_CONNECTION,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_NET,
 ]
 
 # Battery configuration keys
@@ -88,5 +89,5 @@ OPTIMIZATION_STATUS_PENDING = "pending"
 UNIT_CURRENCY = "USD"  # Could be made configurable
 
 # Entity attribute keys
-ATTR_POWER_CONSUMPTION = "power_consumption"
-ATTR_POWER_PRODUCTION = "power_production"
+ATTR_ENERGY = "energy"
+ATTR_POWER = "power"

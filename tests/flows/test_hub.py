@@ -47,18 +47,18 @@ async def test_hub_flow_create_hub_success(hass: HomeAssistant):
 async def test_hub_flow_validation_functions():
     """Test the validation functions."""
     from custom_components.haeo.flows import (
-        validate_entity_name,
+        validate_element_name,
         validate_positive_number,
         validate_percentage,
         validate_efficiency,
     )
     import voluptuous as vol
 
-    # Test entity name validation
-    assert validate_entity_name("Valid Name") == "Valid Name"
+    # Test element name validation
+    assert validate_element_name("Valid Name") == "Valid Name"
 
     with pytest.raises(vol.Invalid):
-        validate_entity_name("")
+        validate_element_name("")
 
     # Test positive number validation
     assert validate_positive_number(100) == 100

@@ -16,19 +16,54 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    CONF_ENTITIES,
-    CONF_CONNECTIONS,
+    CONF_ELEMENTS,
     DOMAIN,
-    ENTITY_TYPE_LOAD,
-    ENTITY_TYPE_GENERATOR,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_CONNECTION,
+    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_NET,
     OPTIMIZATION_STATUS_SUCCESS,
     UNIT_CURRENCY,
-    ATTR_POWER_CONSUMPTION,
-    ATTR_POWER_PRODUCTION,
+    ATTR_POWER,
+    ATTR_ENERGY,
 )
 from .coordinator import HaeoDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def get_device_info_for_element(element_name: str, element_type: str, config_entry: ConfigEntry) -> DeviceInfo:
+    """Get device info for a specific element."""
+    device_name_map = {
+        ELEMENT_TYPE_BATTERY: "Battery",
+        ELEMENT_TYPE_GRID: "Grid Connection",
+        ELEMENT_TYPE_LOAD: "Load",
+        ELEMENT_TYPE_GENERATOR: "Generator",
+        ELEMENT_TYPE_NET: "Network Node",
+        ELEMENT_TYPE_CONNECTION: "Connection",
+    }
+
+    device_name = device_name_map.get(element_type, "Device")
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{config_entry.entry_id}_{element_name}")},
+        name=f"{element_name}",
+        manufacturer="HAEO",
+        model=f"Energy Optimization {device_name}",
+        via_device=(DOMAIN, config_entry.entry_id),
+    )
+
+
+def get_device_info_for_network(config_entry: ConfigEntry) -> DeviceInfo:
+    """Get device info for the main hub."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, config_entry.entry_id)},
+        name="HAEO Energy Optimization Network",
+        manufacturer="HAEO",
+        model="Energy Optimization Network",
+        sw_version="1.0.0",
+    )
 
 
 async def async_setup_entry(
@@ -41,42 +76,29 @@ async def async_setup_entry(
 
     entities: list[SensorEntity] = []
 
-    # Add optimization status and cost sensors
+    # Add optimization status and cost sensors (hub-level)
     entities.append(HaeoOptimizationCostSensor(coordinator, config_entry))
     entities.append(HaeoOptimizationStatusSensor(coordinator, config_entry))
 
-    # Add entity-specific sensors based on available data
-    for entity_config in config_entry.data[CONF_ENTITIES]:
-        entity_name = entity_config[CONF_NAME]
+    # Add element-specific sensors based on available data
+    for element_config in config_entry.data[CONF_ELEMENTS]:
+        element_name = element_config[CONF_NAME]
+        element_type = element_config.get("type", "")
 
         # Create a helper function to check if we have optimization data for this entity
         def has_data_type(data_type: str) -> bool:
             if not coordinator.optimization_result:
                 return True  # Assume we'll have it when optimization runs
             solution = coordinator.optimization_result.get("solution", {})
-            return f"{entity_name}_{data_type}" in solution
+            return f"{element_name}_{data_type}" in solution
 
         # Add power consumption sensor if entity has this capability
-        if has_data_type(ATTR_POWER_CONSUMPTION):
-            entities.append(HaeoEntityPowerConsumptionSensor(coordinator, config_entry, entity_name))
-
-        # Add power production sensor if entity has this capability
-        if has_data_type(ATTR_POWER_PRODUCTION):
-            entities.append(HaeoEntityPowerProductionSensor(coordinator, config_entry, entity_name))
-
-        # Add net power sensor if entity has both consumption and production
-        if has_data_type("power"):
-            entities.append(HaeoEntityNetPowerSensor(coordinator, config_entry, entity_name))
+        if has_data_type(ATTR_POWER):
+            entities.append(HaeoElementPowerSensor(coordinator, config_entry, element_name, element_type))
 
         # Add energy sensor if entity has energy state (like batteries)
-        if has_data_type("energy"):
-            entities.append(HaeoEntityEnergySensor(coordinator, config_entry, entity_name))
-
-    # Add connection sensors
-    for connection_config in config_entry.data.get(CONF_CONNECTIONS, []):
-        source = connection_config["source"]
-        target = connection_config["target"]
-        entities.append(HaeoConnectionPowerSensor(coordinator, config_entry, source, target))
+        if has_data_type(ATTR_ENERGY):
+            entities.append(HaeoElementEnergySensor(coordinator, config_entry, element_name, element_type))
 
     async_add_entities(entities)
 
@@ -92,6 +114,8 @@ class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity)
         config_entry: ConfigEntry,
         sensor_type: str,
         name_suffix: str,
+        element_name: str | None = None,
+        element_type: str | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -99,13 +123,12 @@ class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity)
         self.sensor_type = sensor_type
         self._attr_name = f"HAEO {name_suffix}"
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.config_entry.entry_id)},
-            name="HAEO Energy Optimizer",
-            manufacturer="HAEO",
-            model="Energy Optimization Network",
-            sw_version="1.0.0",
-        )
+
+        # Set device info based on whether this is a hub-level or entity-level sensor
+        if element_name and element_type:
+            self._attr_device_info = get_device_info_for_element(element_name, element_type, config_entry)
+        else:
+            self._attr_device_info = get_device_info_for_network(config_entry)
 
 
 class HaeoOptimizationCostSensor(HaeoSensorBase):
@@ -176,125 +199,37 @@ class HaeoOptimizationStatusSensor(HaeoSensorBase):
         return attrs
 
 
-class HaeoEntityPowerConsumptionSensor(HaeoSensorBase):
-    """Sensor for entity power consumption."""
+class HaeoElementPowerSensor(HaeoSensorBase):
+    """Sensor for element power."""
 
     def __init__(
         self,
         coordinator: HaeoDataUpdateCoordinator,
         config_entry: ConfigEntry,
-        entity_name: str,
+        element_name: str,
+        element_type: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(
-            coordinator, config_entry, f"{entity_name}_power_consumption", f"{entity_name} Power Consumption"
+            coordinator,
+            config_entry,
+            f"{element_name}_power",
+            f"{element_name} Power",
+            element_name,
+            element_type,
         )
-        self.entity_name = entity_name
+        self.element_name = element_name
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_native_unit_of_measurement = UnitOfPower.WATT
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> float | None:
-        """Return the current power consumption."""
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and ATTR_POWER_CONSUMPTION in entity_data:
+        """Return the current net power (positive = producing, negative = consuming)."""
+        element_data = self.coordinator.get_element_data(self.element_name)
+        if element_data and ATTR_POWER in element_data:
             # Return the current period's value (first value)
-            consumption_data = entity_data[ATTR_POWER_CONSUMPTION]
-            return consumption_data[0] if consumption_data else None
-        return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return extra state attributes."""
-        attrs = {}
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and ATTR_POWER_CONSUMPTION in entity_data:
-            consumption_data = entity_data[ATTR_POWER_CONSUMPTION]
-            timestamps = self.coordinator.get_future_timestamps()
-
-            # Add forecast data
-            attrs["forecast"] = consumption_data
-
-            # Add timestamped forecast
-            if len(timestamps) == len(consumption_data):
-                attrs["timestamped_forecast"] = [
-                    {"timestamp": ts, "value": value} for ts, value in zip(timestamps, consumption_data)
-                ]
-        return attrs
-
-
-class HaeoEntityPowerProductionSensor(HaeoSensorBase):
-    """Sensor for entity power production."""
-
-    def __init__(
-        self,
-        coordinator: HaeoDataUpdateCoordinator,
-        config_entry: ConfigEntry,
-        entity_name: str,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(
-            coordinator, config_entry, f"{entity_name}_power_production", f"{entity_name} Power Production"
-        )
-        self.entity_name = entity_name
-        self._attr_device_class = SensorDeviceClass.POWER
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current power production."""
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and ATTR_POWER_PRODUCTION in entity_data:
-            # Return the current period's value (first value)
-            production_data = entity_data[ATTR_POWER_PRODUCTION]
-            return production_data[0] if production_data else None
-        return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return extra state attributes."""
-        attrs = {}
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and ATTR_POWER_PRODUCTION in entity_data:
-            production_data = entity_data[ATTR_POWER_PRODUCTION]
-            timestamps = self.coordinator.get_future_timestamps()
-
-            # Add forecast data
-            attrs["forecast"] = production_data
-
-            # Add timestamped forecast
-            if len(timestamps) == len(production_data):
-                attrs["timestamped_forecast"] = [
-                    {"timestamp": ts, "value": value} for ts, value in zip(timestamps, production_data)
-                ]
-        return attrs
-
-
-class HaeoEntityNetPowerSensor(HaeoSensorBase):
-    """Sensor for entity net power (consumption - production)."""
-
-    def __init__(
-        self,
-        coordinator: HaeoDataUpdateCoordinator,
-        config_entry: ConfigEntry,
-        entity_name: str,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, config_entry, f"{entity_name}_net_power", f"{entity_name} Net Power")
-        self.entity_name = entity_name
-        self._attr_device_class = SensorDeviceClass.POWER
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current net power."""
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "power" in entity_data:
-            # Return the current period's value (first value)
-            power_data = entity_data["power"]
+            power_data = element_data[ATTR_POWER]
             return power_data[0] if power_data else None
         return None
 
@@ -302,57 +237,37 @@ class HaeoEntityNetPowerSensor(HaeoSensorBase):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
         attrs = {}
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "power" in entity_data:
-            attrs["forecast"] = entity_data["power"]
+        element_data = self.coordinator.get_element_data(self.element_name)
+        if element_data and ATTR_POWER in element_data:
+            power_data = element_data[ATTR_POWER]
+            timestamps = self.coordinator.get_future_timestamps()
+
+            # Add forecast data
+            attrs["forecast"] = power_data
+
+            # Add timestamped forecast
+            if len(timestamps) == len(power_data):
+                attrs["timestamped_forecast"] = [
+                    {"timestamp": ts, "value": value} for ts, value in zip(timestamps, power_data)
+                ]
         return attrs
 
 
-class HaeoEntityPowerSensor(HaeoSensorBase):
-    """Sensor for single power value entities (load, generator)."""
-
-    def __init__(
-        self,
-        coordinator: HaeoDataUpdateCoordinator,
-        config_entry: ConfigEntry,
-        entity_name: str,
-        entity_type: str,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, config_entry, f"{entity_name}_power", f"{entity_name} Power")
-        self.entity_name = entity_name
-        self.entity_type = entity_type
-        self._attr_device_class = SensorDeviceClass.POWER
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current power."""
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data:
-            # For loads, check power_consumption; for generators, check power_production
-            if self.entity_type == ENTITY_TYPE_LOAD and ATTR_POWER_CONSUMPTION in entity_data:
-                power_data = entity_data[ATTR_POWER_CONSUMPTION]
-                return power_data[0] if power_data else None
-            elif self.entity_type == ENTITY_TYPE_GENERATOR and ATTR_POWER_PRODUCTION in entity_data:
-                power_data = entity_data[ATTR_POWER_PRODUCTION]
-                return power_data[0] if power_data else None
-        return None
-
-
-class HaeoEntityEnergySensor(HaeoSensorBase):
+class HaeoElementEnergySensor(HaeoSensorBase):
     """Sensor for entity energy (batteries)."""
 
     def __init__(
         self,
         coordinator: HaeoDataUpdateCoordinator,
         config_entry: ConfigEntry,
-        entity_name: str,
+        element_name: str,
+        element_type: str,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator, config_entry, f"{entity_name}_energy", f"{entity_name} Energy")
-        self.entity_name = entity_name
+        super().__init__(
+            coordinator, config_entry, f"{element_name}_energy", f"{element_name} Energy", element_name, element_type
+        )
+        self.element_name = element_name
         self._attr_device_class = SensorDeviceClass.ENERGY_STORAGE
         self._attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
         self._attr_state_class = SensorStateClass.TOTAL
@@ -360,10 +275,10 @@ class HaeoEntityEnergySensor(HaeoSensorBase):
     @property
     def native_value(self) -> float | None:
         """Return the current energy level."""
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "energy" in entity_data:
+        element_data = self.coordinator.get_element_data(self.element_name)
+        if element_data and ATTR_ENERGY in element_data:
             # Return the current period's value (first value)
-            energy_data = entity_data["energy"]
+            energy_data = element_data[ATTR_ENERGY]
             return energy_data[0] if energy_data else None
         return None
 
@@ -371,9 +286,9 @@ class HaeoEntityEnergySensor(HaeoSensorBase):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra state attributes."""
         attrs = {}
-        entity_data = self.coordinator.get_entity_data(self.entity_name)
-        if entity_data and "energy" in entity_data:
-            energy_data = entity_data["energy"]
+        element_data = self.coordinator.get_element_data(self.element_name)
+        if element_data and ATTR_ENERGY in element_data:
+            energy_data = element_data[ATTR_ENERGY]
             timestamps = self.coordinator.get_future_timestamps()
 
             # Add forecast data
@@ -384,60 +299,4 @@ class HaeoEntityEnergySensor(HaeoSensorBase):
                 attrs["timestamped_forecast"] = [
                     {"timestamp": ts, "value": value} for ts, value in zip(timestamps, energy_data)
                 ]
-        return attrs
-
-
-class HaeoConnectionPowerSensor(HaeoSensorBase):
-    """Sensor for connection power flow."""
-
-    def __init__(
-        self,
-        coordinator: HaeoDataUpdateCoordinator,
-        config_entry: ConfigEntry,
-        source: str,
-        target: str,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator, config_entry, f"{source}_to_{target}_power", f"{source} to {target} Power Flow")
-        self.source = source
-        self.target = target
-        self._attr_device_class = SensorDeviceClass.POWER
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current power flow."""
-        connection_data = self.coordinator.get_connection_data(self.source, self.target)
-        if connection_data:
-            # Return the current period's value (first value)
-            return connection_data[0] if connection_data else None
-        return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return extra state attributes."""
-        # Build attributes dict with required fields
-        attrs: dict[str, Any] = {
-            "optimization_status": self.coordinator.optimization_status,
-            "source": self.source,
-            "target": self.target,
-        }
-
-        # Add optimization timestamp if available
-        if self.coordinator.last_optimization_time:
-            attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
-
-        # Add forecast data if available
-        connection_data = self.coordinator.get_connection_data(self.source, self.target)
-        if connection_data:
-            timestamps = self.coordinator.get_future_timestamps()
-            attrs["forecast"] = connection_data
-
-            # Add timestamped forecast if timestamps match data length
-            if len(timestamps) == len(connection_data):
-                attrs["timestamped_forecast"] = [
-                    {"timestamp": ts, "value": value} for ts, value in zip(timestamps, connection_data)
-                ]
-
         return attrs

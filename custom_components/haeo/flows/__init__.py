@@ -9,7 +9,7 @@ import voluptuous as vol
 _LOGGER = logging.getLogger(__name__)
 
 # Optimized validators using voluptuous built-ins
-validate_entity_name = vol.All(str, vol.Strip, vol.Length(min=1, msg="Name cannot be empty"))
+validate_element_name = vol.All(str, vol.Strip, vol.Length(min=1, msg="Name cannot be empty"))
 validate_positive_number = vol.All(
     vol.Coerce(float), vol.Range(min=0, min_included=False, msg="Value must be positive")
 )

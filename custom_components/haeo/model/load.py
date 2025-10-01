@@ -1,9 +1,9 @@
 from typing import Sequence
 
-from .entity import Entity
+from .element import Element
 
 
-class Load(Entity):
+class Load(Element):
     """Load entity for electrical system modeling."""
 
     def __init__(self, name: str, period: int, n_periods: int, forecast: Sequence[float]):

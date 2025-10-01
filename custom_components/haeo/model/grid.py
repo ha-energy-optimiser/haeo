@@ -1,10 +1,10 @@
 from typing import Sequence
 from pulp import LpVariable
 
-from .entity import Entity
+from .element import Element
 
 
-class Grid(Entity):
+class Grid(Element):
     """Unified Grid entity for electrical system modeling with separate import/export pricing."""
 
     def __init__(

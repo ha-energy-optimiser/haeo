@@ -20,7 +20,7 @@ from homeassistant.helpers.selector import (
 )
 
 from ..const import (
-    ENTITY_TYPE_LOAD,
+    ELEMENT_TYPE_LOAD,
     CONF_LOAD_TYPE,
     CONF_POWER,
     CONF_ENERGY,
@@ -30,7 +30,7 @@ from ..const import (
     LOAD_TYPE_FORECAST,
 )
 from . import (
-    validate_entity_name,
+    validate_element_name,
     validate_positive_number,
 )
 
@@ -41,7 +41,7 @@ def get_load_schema() -> vol.Schema:
     """Get the load configuration schema."""
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): vol.All(str, validate_entity_name),
+            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
             vol.Required(CONF_LOAD_TYPE): SelectSelector(
                 SelectSelectorConfig(
                     options=[
@@ -82,6 +82,6 @@ def get_load_schema() -> vol.Schema:
 def create_load_participant(config: dict[str, Any]) -> dict[str, Any]:
     """Create a load participant configuration."""
     return {
-        "type": ENTITY_TYPE_LOAD,
+        "type": ELEMENT_TYPE_LOAD,
         **config,
     }

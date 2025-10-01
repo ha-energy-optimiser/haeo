@@ -9,7 +9,7 @@ from custom_components.haeo.flows.net import (
     create_net_participant,
 )
 from custom_components.haeo.const import (
-    ENTITY_TYPE_NET,
+    ELEMENT_TYPE_NET,
 )
 
 
@@ -68,5 +68,5 @@ async def test_net_participant_creation(
     """Test net participant creation with various configurations."""
     participant = create_net_participant(net_data)
 
-    assert participant["type"] == ENTITY_TYPE_NET
+    assert participant["type"] == ELEMENT_TYPE_NET
     assert participant[CONF_NAME] == net_data[CONF_NAME]

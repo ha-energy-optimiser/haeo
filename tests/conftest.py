@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from custom_components.haeo.const import ENTITY_TYPE_BATTERY, ENTITY_TYPE_GRID
+from custom_components.haeo.const import ELEMENT_TYPE_BATTERY, ELEMENT_TYPE_GRID
 
 # Enable custom component for testing
 pytest_plugins = ["pytest_homeassistant_custom_component"]
@@ -32,7 +32,7 @@ def simple_config_entry_data():
         "entities": [
             {
                 "name": "test_battery",
-                "entity_type": ENTITY_TYPE_BATTERY,
+                "entity_type": ELEMENT_TYPE_BATTERY,
                 "config": {
                     "capacity": 10000,
                     "initial_charge_percentage": 50,
@@ -40,7 +40,7 @@ def simple_config_entry_data():
             },
             {
                 "name": "test_grid",
-                "entity_type": ENTITY_TYPE_GRID,
+                "entity_type": ELEMENT_TYPE_GRID,
                 "config": {
                     "import_limit": 10000,
                     "export_limit": 5000,

@@ -15,11 +15,12 @@ from homeassistant.helpers.selector import (
 )
 
 from ..const import (
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
-    ENTITY_TYPE_LOAD,
-    ENTITY_TYPE_GENERATOR,
-    ENTITY_TYPE_NET,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_LOAD,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_NET,
+    ELEMENT_TYPE_CONNECTION,
 )
 from .battery import get_battery_schema, create_battery_participant
 from .grid import get_grid_schema, create_grid_participant
@@ -30,7 +31,6 @@ from .connection import (
     get_connection_schema,
     create_connection_participant,
     validate_connection_config,
-    ENTITY_TYPE_CONNECTION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,27 +52,27 @@ class HubOptionsFlow(config_entries.OptionsFlow):
             participant_type = user_input["participant_type"]
 
             # Route to specific configuration step
-            if participant_type == ENTITY_TYPE_BATTERY:
+            if participant_type == ELEMENT_TYPE_BATTERY:
                 return await self.async_step_configure_battery()
-            elif participant_type == ENTITY_TYPE_GRID:
+            elif participant_type == ELEMENT_TYPE_GRID:
                 return await self.async_step_configure_grid()
-            elif participant_type == ENTITY_TYPE_LOAD:
+            elif participant_type == ELEMENT_TYPE_LOAD:
                 return await self.async_step_configure_load()
-            elif participant_type == ENTITY_TYPE_GENERATOR:
+            elif participant_type == ELEMENT_TYPE_GENERATOR:
                 return await self.async_step_configure_generator()
-            elif participant_type == ENTITY_TYPE_NET:
+            elif participant_type == ELEMENT_TYPE_NET:
                 return await self.async_step_configure_net()
-            elif participant_type == ENTITY_TYPE_CONNECTION:
+            elif participant_type == ELEMENT_TYPE_CONNECTION:
                 return await self.async_step_configure_connection()
 
         # Show participant type selection
         participant_types = [
-            ENTITY_TYPE_BATTERY,
-            ENTITY_TYPE_GRID,
-            ENTITY_TYPE_LOAD,
-            ENTITY_TYPE_GENERATOR,
-            ENTITY_TYPE_NET,
-            ENTITY_TYPE_CONNECTION,
+            ELEMENT_TYPE_BATTERY,
+            ELEMENT_TYPE_GRID,
+            ELEMENT_TYPE_LOAD,
+            ELEMENT_TYPE_GENERATOR,
+            ELEMENT_TYPE_NET,
+            ELEMENT_TYPE_CONNECTION,
         ]
 
         return self.async_show_form(
@@ -196,7 +196,7 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
         # Filter out existing connections to avoid connecting connections
         device_participants = {
-            name: config for name, config in participants.items() if config.get("type") != ENTITY_TYPE_CONNECTION
+            name: config for name, config in participants.items() if config.get("type") != ELEMENT_TYPE_CONNECTION
         }
 
         if len(device_participants) < 2:

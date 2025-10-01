@@ -9,7 +9,7 @@ from custom_components.haeo.flows.grid import (
     create_grid_participant,
 )
 from custom_components.haeo.const import (
-    ENTITY_TYPE_GRID,
+    ELEMENT_TYPE_GRID,
     CONF_IMPORT_LIMIT,
     CONF_EXPORT_LIMIT,
     CONF_PRICE_IMPORT,
@@ -118,7 +118,7 @@ async def test_grid_participant_creation(
     """Test grid participant creation with various configurations."""
     participant = create_grid_participant(grid_data)
 
-    assert participant["type"] == ENTITY_TYPE_GRID
+    assert participant["type"] == ELEMENT_TYPE_GRID
     assert participant[CONF_IMPORT_LIMIT] == grid_data[CONF_IMPORT_LIMIT]
 
     if expected_type == "constant":

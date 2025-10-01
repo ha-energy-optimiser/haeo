@@ -13,19 +13,19 @@ from custom_components.haeo.const import (
     CONF_TARGET,
     CONF_MIN_POWER,
     CONF_MAX_POWER,
-    ENTITY_TYPE_BATTERY,
-    ENTITY_TYPE_GRID,
-    ENTITY_TYPE_GENERATOR,
-    ENTITY_TYPE_LOAD,
+    ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_LOAD,
 )
 
 
 # Mock participants for testing
 MOCK_PARTICIPANTS = {
-    "battery_1": {"type": ENTITY_TYPE_BATTERY, "name": "Battery 1"},
-    "grid_1": {"type": ENTITY_TYPE_GRID, "name": "Grid 1"},
-    "solar_1": {"type": ENTITY_TYPE_GENERATOR, "name": "Solar 1"},
-    "house_load": {"type": ENTITY_TYPE_LOAD, "name": "House Load"},
+    "battery_1": {"type": ELEMENT_TYPE_BATTERY, "name": "Battery 1"},
+    "grid_1": {"type": ELEMENT_TYPE_GRID, "name": "Grid 1"},
+    "solar_1": {"type": ELEMENT_TYPE_GENERATOR, "name": "Solar 1"},
+    "house_load": {"type": ELEMENT_TYPE_LOAD, "name": "House Load"},
 }
 
 # Connection-specific test data

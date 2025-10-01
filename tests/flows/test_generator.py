@@ -9,7 +9,7 @@ from custom_components.haeo.flows.generator import (
     create_generator_participant,
 )
 from custom_components.haeo.const import (
-    ENTITY_TYPE_GENERATOR,
+    ELEMENT_TYPE_GENERATOR,
     CONF_MAX_POWER,
     CONF_ENERGY,
     CONF_CURTAILMENT,
@@ -134,7 +134,7 @@ async def test_generator_participant_creation(
     """Test generator participant creation with various configurations."""
     participant = create_generator_participant(generator_data)
 
-    assert participant["type"] == ENTITY_TYPE_GENERATOR
+    assert participant["type"] == ELEMENT_TYPE_GENERATOR
     assert participant[CONF_MAX_POWER] == generator_data[CONF_MAX_POWER]
 
     if expected_type in ["curtailable", "forecast"]:

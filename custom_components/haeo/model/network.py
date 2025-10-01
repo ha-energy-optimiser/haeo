@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
-from typing import Sequence, Dict, Tuple, MutableSequence
+from typing import Sequence, Dict, MutableSequence
 from pulp import LpConstraint, LpProblem, LpMinimize, LpStatus, value, lpSum
 
-from .entity import Entity
+from .element import Element
 from .connection import Connection
 from .battery import Battery
 from .generator import Generator
@@ -18,103 +18,60 @@ class Network:
     name: str
     period: int
     n_periods: int
-    entities: Dict[str, Entity] = field(default_factory=dict)
-    connections: Dict[Tuple[str, str], Connection] = field(default_factory=dict)
+    elements: Dict[str, Element] = field(default_factory=dict)
 
-    def add(self, entity_type: str, name: str, **kwargs) -> Entity:
-        """Add an entity to the network by type.
+    def add(self, element_type: str, name: str, **kwargs) -> Element:
+        """Add an element to the network by type.
 
         Args:
-            entity_type: Type of entity ('battery', 'generator', 'load', 'grid', 'net')
-            name: Name of the entity
-            **kwargs: Additional arguments specific to the entity type
+            element_type: Type of element as a string
+            name: Name of the element
+            **kwargs: Additional arguments specific to the element type
 
         Returns:
-            The created entity
+            The created element
         """
-        # Set n_periods if not provided and required by entity type
-        self.entities[name] = {
+        # Set n_periods if not provided and required by element type
+        self.elements[name] = {
             "battery": Battery,
             "generator": Generator,
             "load": Load,
             "grid": Grid,
             "net": Net,
-        }[entity_type.lower()](name=name, period=self.period, n_periods=self.n_periods, **kwargs)
-
-        return self.entities[name]
-
-    def connect(
-        self,
-        source_name: str,
-        target_name: str,
-        min_power: float | None = None,
-        max_power: float | None = None,
-    ) -> Connection:
-        """Connect two entities in the network.
-
-        Args:
-            source_name: Name of the source entity
-            target_name: Name of the target entity
-            efficiency: Connection efficiency (0-1)
-            min_power: Minimum power flow
-            max_power: Maximum power flow
-
-        Returns:
-            The created connection
-        """
-        source_entity = self.entities.get(source_name)
-        target_entity = self.entities.get(target_name)
-
-        if not source_entity:
-            raise ValueError(f"Source entity '{source_name}' not found in network")
-        if not target_entity:
-            raise ValueError(f"Target entity '{target_name}' not found in network")
-
-        connection = Connection(
-            period=self.period,
-            n_periods=self.n_periods,
-            source_entity=source_entity,
-            target_entity=target_entity,
-            min_power=min_power,
-            max_power=max_power,
-        )
-
-        # Store connection using tuple of names as key
-        self.connections[(source_name, target_name)] = connection
-
-        return connection
+            "connection": Connection,
+        }[element_type.lower()](name=name, period=self.period, n_periods=self.n_periods, **kwargs)
+        return self.elements[name]
 
     def constraints(self) -> Sequence[LpConstraint]:
         """Return constraints for the network."""
         constraints: MutableSequence[LpConstraint] = []
 
-        # Add entity-specific constraints
-        for entity in self.entities.values():
-            constraints.extend(entity.constraints())
+        # Add element-specific constraints (including connection elements)
+        for element in self.elements.values():
+            constraints.extend(element.constraints())
 
-        # Add connection constraints
-        for connection in self.connections.values():
-            constraints.extend(connection.constraints())
-
-        # Add power balance constraints for each entity based on the connections
-        for entity in self.entities.values():
+        # Add power balance constraints for each element based on the connections
+        # We need to identify connection elements and handle their power flows
+        for element in self.elements.values():
             for t in range(self.n_periods):
                 balance_terms = []
 
-                # Add entity's own consumption and production
-                if entity.power_consumption is not None:
-                    balance_terms.append(-entity.power_consumption[t])
-                if entity.power_production is not None:
-                    balance_terms.append(entity.power_production[t])
+                # Add element's own consumption and production
+                if isinstance(element, Element):
+                    if element.power_consumption is not None:
+                        balance_terms.append(-element.power_consumption[t])
+                    if element.power_production is not None:
+                        balance_terms.append(element.power_production[t])
 
-                # Add connection flows
-                for connection in self.connections.values():
-                    if connection.source_entity == entity:
-                        # Power leaving the entity (negative for balance)
-                        balance_terms.append(-connection.power[t])
-                    elif connection.target_entity == entity:
-                        # Power entering the entity (positive for balance)
-                        balance_terms.append(connection.power[t])
+                # Add connection flows - check if this element is connected via connection elements
+                for conn_element in self.elements.values():
+                    if isinstance(conn_element, Connection):
+                        if conn_element.source == element.name:
+                            # Power leaving the element (negative for balance)
+                            balance_terms.append(-conn_element.power[t])
+                        elif conn_element.target == element.name:
+                            # Power entering the element (positive for balance)
+                            balance_terms.append(conn_element.power[t])
 
                 # Power balance: sum of all terms should be zero
                 if balance_terms:
@@ -124,17 +81,12 @@ class Network:
 
     def cost(self):
         """Return the cost expression for the network."""
-        return lpSum(
-            [
-                *[e.cost() for e in self.entities.values() if e.cost() != 0],
-                *[c.cost() for c in self.connections.values() if c.cost() != 0],
-            ]
-        )
+        return lpSum([e.cost() for e in self.elements.values() if e.cost() != 0])
 
     def optimize(self) -> float:
         """Solve the optimization problem and return the cost.
 
-        After optimization, access optimized values directly from entities and connections.
+        After optimization, access optimized values directly from elements and connections.
 
         Returns:
             The total optimization cost
@@ -168,3 +120,18 @@ class Network:
             return total_cost
         else:
             raise ValueError(f"Optimization failed with status: {LpStatus[status]}")
+
+    def validate(self) -> None:
+        """Validate the network."""
+
+        # Check that all connection elements have valid source and target elements
+        for element in self.elements.values():
+            if isinstance(element, Connection):
+                if element.source not in self.elements:
+                    raise ValueError(f"Source element '{element.source}' not found")
+                if element.target not in self.elements:
+                    raise ValueError(f"Target element '{element.target}' not found")
+                if isinstance(self.elements[element.source], Connection):
+                    raise ValueError(f"Source element '{element.source}' is a connection")
+                if isinstance(self.elements[element.target], Connection):
+                    raise ValueError(f"Target element '{element.target}' is a connection")

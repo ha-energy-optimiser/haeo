@@ -16,7 +16,7 @@ from homeassistant.helpers.selector import (
 )
 
 from ..const import (
-    ENTITY_TYPE_GENERATOR,
+    ELEMENT_TYPE_GENERATOR,
     CONF_MAX_POWER,
     CONF_CURTAILMENT,
     CONF_PRICE_PRODUCTION,
@@ -24,7 +24,7 @@ from ..const import (
     CONF_FORECAST_SENSORS,
 )
 from . import (
-    validate_entity_name,
+    validate_element_name,
     validate_positive_number,
     validate_non_negative_number,
 )
@@ -36,7 +36,7 @@ def get_generator_schema() -> vol.Schema:
     """Get the generator configuration schema."""
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): vol.All(str, validate_entity_name),
+            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
             vol.Optional(CONF_MAX_POWER): vol.All(
                 NumberSelector(
                     NumberSelectorConfig(
@@ -79,6 +79,6 @@ def get_generator_schema() -> vol.Schema:
 def create_generator_participant(config: dict[str, Any]) -> dict[str, Any]:
     """Create a generator participant configuration."""
     return {
-        "type": ENTITY_TYPE_GENERATOR,
+        "type": ELEMENT_TYPE_GENERATOR,
         **config,
     }

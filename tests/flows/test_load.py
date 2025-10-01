@@ -9,7 +9,7 @@ from custom_components.haeo.flows.load import (
     create_load_participant,
 )
 from custom_components.haeo.const import (
-    ENTITY_TYPE_LOAD,
+    ELEMENT_TYPE_LOAD,
     CONF_LOAD_TYPE,
     CONF_POWER,
     CONF_ENERGY,
@@ -111,6 +111,6 @@ async def test_load_participant_creation(
     """Test load participant creation with various configurations."""
     participant = create_load_participant(load_data)
 
-    assert participant["type"] == ENTITY_TYPE_LOAD
+    assert participant["type"] == ELEMENT_TYPE_LOAD
     assert participant[CONF_LOAD_TYPE] == expected_type
     assert participant[CONF_POWER] == load_data[CONF_POWER]
