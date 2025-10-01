@@ -56,8 +56,8 @@ def mock_config_entry():
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
-                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    CONF_PRICE_IMPORT_SENSOR: ["sensor.import_price"],
+                    CONF_PRICE_EXPORT_SENSOR: ["sensor.export_price"],
                     # For tests, use constant pricing to avoid sensor setup complexity
                     "price_import": [0.1] * DEFAULT_N_PERIODS,
                     "price_export": [0.05] * DEFAULT_N_PERIODS,
@@ -332,8 +332,8 @@ async def test_build_network_with_grid_sensor_pricing(hass: HomeAssistant):
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
-                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    CONF_PRICE_IMPORT_SENSOR: ["sensor.import_price"],
+                    CONF_PRICE_EXPORT_SENSOR: ["sensor.export_price"],
                 }
             },
         },
@@ -367,8 +367,8 @@ async def test_build_network_with_constant_pricing(hass: HomeAssistant):
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
-                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    CONF_PRICE_IMPORT_SENSOR: ["sensor.import_price"],
+                    CONF_PRICE_EXPORT_SENSOR: ["sensor.export_price"],
                 }
             },
         },
@@ -395,8 +395,8 @@ async def test_build_network_with_mixed_pricing(hass: HomeAssistant):
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
-                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    CONF_PRICE_IMPORT_SENSOR: ["sensor.import_price"],
+                    CONF_PRICE_EXPORT_SENSOR: ["sensor.export_price"],
                 }
             },
         },
@@ -408,10 +408,15 @@ async def test_build_network_with_mixed_pricing(hass: HomeAssistant):
     # Mock sensor forecast data for import and export (576 periods)
     with patch.object(coordinator, "_get_sensor_forecast") as mock_forecast:
 
-        def mock_forecast_side_effect(sensor_id):
-            if sensor_id == "sensor.import_price":
+        def mock_forecast_side_effect(sensor_ids):
+            if isinstance(sensor_ids, list):
+                if "sensor.import_price" in sensor_ids:
+                    return [0.1] * DEFAULT_N_PERIODS
+                elif "sensor.export_price" in sensor_ids:
+                    return [0.05] * DEFAULT_N_PERIODS
+            elif sensor_ids == "sensor.import_price":
                 return [0.1] * DEFAULT_N_PERIODS
-            elif sensor_id == "sensor.export_price":
+            elif sensor_ids == "sensor.export_price":
                 return [0.05] * DEFAULT_N_PERIODS
             return None
 
@@ -424,8 +429,8 @@ async def test_build_network_with_mixed_pricing(hass: HomeAssistant):
 
         # Verify sensors were called for both import and export
         assert mock_forecast.call_count == 2
-        mock_forecast.assert_any_call("sensor.import_price")
-        mock_forecast.assert_any_call("sensor.export_price")
+        mock_forecast.assert_any_call(["sensor.import_price"])
+        mock_forecast.assert_any_call(["sensor.export_price"])
 
 
 async def test_build_network_element_creation_error(hass: HomeAssistant):
@@ -467,8 +472,8 @@ async def test_collect_sensor_data_with_grid_price_sensors(hass: HomeAssistant):
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
-                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    CONF_PRICE_IMPORT_SENSOR: ["sensor.import_price"],
+                    CONF_PRICE_EXPORT_SENSOR: ["sensor.export_price"],
                 }
             },
         },
@@ -520,7 +525,7 @@ async def test_collect_sensor_data_with_load_forecast_sensors(hass: HomeAssistan
         await coordinator._collect_sensor_data()
 
         # Verify sensor was called
-        mock_forecast.assert_called_once_with("sensor.load_forecast")
+        mock_forecast.assert_called_once_with(["sensor.load_forecast"])
 
 
 async def test_collect_sensor_data_with_additional_sensors(hass: HomeAssistant):

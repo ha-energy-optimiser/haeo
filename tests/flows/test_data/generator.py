@@ -16,6 +16,7 @@ VALID_DATA = [
             CONF_NAME: "Test Generator",
             CONF_POWER_SENSOR: "sensor.generator_power",
             CONF_CURTAILMENT: False,
+            CONF_FORECAST_SENSORS: ["sensor.generator_forecast"],
         },
     },
     {
@@ -24,6 +25,7 @@ VALID_DATA = [
             CONF_NAME: "Curtailable Generator",
             CONF_POWER_SENSOR: "sensor.generator_power",
             CONF_CURTAILMENT: True,
+            CONF_FORECAST_SENSORS: ["sensor.generator_forecast"],
             CONF_PRICE_PRODUCTION: 0.03,
         },
     },

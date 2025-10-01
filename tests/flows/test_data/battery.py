@@ -69,6 +69,6 @@ INVALID_DATA = [
             CONF_CHARGE_COST: 0.0,
             CONF_DISCHARGE_COST: 0.0,
         },
-        "error": "too small",
+        "error": "value must be positive",
     },
 ]

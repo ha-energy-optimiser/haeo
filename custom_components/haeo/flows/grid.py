@@ -19,7 +19,7 @@ from ..const import (
     CONF_PRICE_EXPORT_SENSOR,
     CONF_ELEMENT_TYPE,
 )
-from . import validate_element_name, validate_price_sensors, validate_power_value
+from . import validate_element_name, validate_power_value, validate_price_sensors
 
 
 _LOGGER = logging.getLogger(__name__)

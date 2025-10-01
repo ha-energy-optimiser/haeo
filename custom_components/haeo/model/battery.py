@@ -13,7 +13,7 @@ class Battery(Element):
         period: int,
         n_periods: int,
         capacity: float,
-        initial_charge_percentage: float,
+        initial_charge_percentage: float | None = None,
         min_charge_percentage: float = 10,
         max_charge_percentage: float = 90,
         max_charge_power: float | None = None,
@@ -23,6 +23,10 @@ class Battery(Element):
         discharge_cost: float | None = None,
     ):
         self.capacity = capacity  # Store capacity in watt-hours
+
+        # Use provided initial charge percentage or default to minimum charge percentage
+        if initial_charge_percentage is None:
+            initial_charge_percentage = min_charge_percentage
 
         super().__init__(
             name=name,

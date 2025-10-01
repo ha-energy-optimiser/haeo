@@ -33,7 +33,6 @@ ELEMENT_TYPES = [
 
 # Battery configuration keys
 CONF_CAPACITY = "capacity"
-CONF_INITIAL_CHARGE_PERCENTAGE = "initial_charge_percentage"
 CONF_CURRENT_CHARGE_SENSOR = "current_charge_sensor"
 CONF_MIN_CHARGE_PERCENTAGE = "min_charge_percentage"
 CONF_MAX_CHARGE_PERCENTAGE = "max_charge_percentage"

@@ -15,15 +15,11 @@ from .const import (
     ATTR_POWER,
     CONF_ELEMENT_TYPE,
     DOMAIN,
-    ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_GENERATOR,
-    ELEMENT_TYPE_LOAD_FORECAST,
     CONF_SENSORS,
     CONF_SENSOR_ENTITY_ID,
     CONF_SENSOR_ATTRIBUTE,
     CONF_CURRENT_CHARGE_SENSOR,
-    CONF_INITIAL_CHARGE_PERCENTAGE,
     CONF_PRICE_IMPORT_SENSOR,
     CONF_PRICE_EXPORT_SENSOR,
     CONF_FORECAST_SENSORS,
@@ -81,6 +77,12 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Collect sensor data
             await self._collect_sensor_data()
 
+            # Check if all required sensor data is available
+            if not self._check_sensor_data_availability():
+                self.optimization_status = OPTIMIZATION_STATUS_FAILED
+                _LOGGER.warning("Required sensor data not available, skipping optimization")
+                raise UpdateFailed("Required sensor data not available")
+
             # Run optimization
             cost = await self.hass.async_add_executor_job(self._run_optimization)
 
@@ -98,6 +100,43 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.optimization_status = OPTIMIZATION_STATUS_FAILED
             _LOGGER.error("Failed to update HAEO data: %s", ex)
             raise UpdateFailed(f"Error updating HAEO data: {ex}") from ex
+
+    def _check_sensor_data_availability(self) -> bool:
+        """Check if all required sensor data is available for optimization."""
+        participants = self.config.get("participants", {})
+
+        for element_name, element_config in participants.items():
+            # Check current charge sensor for batteries
+            if CONF_CURRENT_CHARGE_SENSOR in element_config:
+                sensor_id = element_config[CONF_CURRENT_CHARGE_SENSOR]
+                if not self._is_sensor_available(sensor_id, f"{element_name} current charge"):
+                    return False
+
+            # Check forecast sensors for any element that has them
+            if CONF_FORECAST_SENSORS in element_config:
+                forecast_sensors = element_config[CONF_FORECAST_SENSORS]
+                if isinstance(forecast_sensors, list):
+                    for sensor in forecast_sensors:
+                        if not self._is_sensor_available(sensor, f"{element_name} forecast"):
+                            return False
+                elif isinstance(forecast_sensors, str):
+                    if not self._is_sensor_available(forecast_sensors, f"{element_name} forecast"):
+                        return False
+
+        return True
+
+    def _is_sensor_available(self, sensor_id: str, context: str) -> bool:
+        """Check if a sensor is available and has valid state."""
+        state = self.hass.states.get(sensor_id)
+        if not state or state.state in ["unknown", "unavailable", "none"]:
+            _LOGGER.warning(
+                "%s sensor %s not available (state: %s)",
+                context,
+                sensor_id,
+                state.state if state else "not found",
+            )
+            return False
+        return True
 
     async def _build_network(self) -> None:
         """Build the network from configuration."""
@@ -134,29 +173,29 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Adding element: %s (%s)", element_name, element_type)
 
             try:
-                # Handle battery entities - use current charge from sensor
-                if element_type == ELEMENT_TYPE_BATTERY:
-                    if CONF_CURRENT_CHARGE_SENSOR in element_config:  # Check original config, not filtered params
-                        current_charge_sensor = element_config[CONF_CURRENT_CHARGE_SENSOR]
-                        current_charge = await self._get_sensor_value(current_charge_sensor)
-                        if current_charge is not None:
-                            # Update initial charge percentage from sensor
-                            element_params[CONF_INITIAL_CHARGE_PERCENTAGE] = current_charge
+                # Handle current charge sensor for batteries
+                if CONF_CURRENT_CHARGE_SENSOR in element_config:  # Check original config, not filtered params
+                    current_charge_sensor = element_config[CONF_CURRENT_CHARGE_SENSOR]
+                    current_charge = await self._get_sensor_value(current_charge_sensor)
+                    if current_charge is not None:
+                        # Update initial charge percentage from sensor
+                        element_params["initial_charge_percentage"] = current_charge
 
-                # Handle grid entities - need price arrays
+                # Handle pricing from sensors for grid entities
                 if element_type == ELEMENT_TYPE_GRID:
-                    # Handle pricing from sensors
                     import_price_array = None
                     export_price_array = None
 
                     # Check for sensor-based pricing
                     if CONF_PRICE_IMPORT_SENSOR in element_config:  # Check original config
-                        import_price_data = await self._get_sensor_forecast(element_config[CONF_PRICE_IMPORT_SENSOR])
+                        import_sensors = element_config[CONF_PRICE_IMPORT_SENSOR]
+                        import_price_data = await self._get_sensor_forecast(import_sensors)
                         if import_price_data:
                             import_price_array = import_price_data
 
                     if CONF_PRICE_EXPORT_SENSOR in element_config:  # Check original config
-                        export_price_data = await self._get_sensor_forecast(element_config[CONF_PRICE_EXPORT_SENSOR])
+                        export_sensors = element_config[CONF_PRICE_EXPORT_SENSOR]
+                        export_price_data = await self._get_sensor_forecast(export_sensors)
                         if export_price_data:
                             export_price_array = export_price_data
 
@@ -187,35 +226,29 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             element_type = element_config[CONF_ELEMENT_TYPE]
 
             # Update dynamic sensor data for all entity types with forecast/price sensors
-            if element_type == ELEMENT_TYPE_GRID:
-                # Update price data from sensors for grid entities
-                if CONF_PRICE_IMPORT_SENSOR in element_config:
-                    price_import_data = await self._get_sensor_forecast(element_config[CONF_PRICE_IMPORT_SENSOR])
-                    if price_import_data:
-                        element = self.network.elements[element_name]
-                        element.price_production = price_import_data
+            # Handle price sensors for grid entities
+            if CONF_PRICE_IMPORT_SENSOR in element_config:
+                price_import_sensors = element_config[CONF_PRICE_IMPORT_SENSOR]
+                price_import_data = await self._get_sensor_forecast(price_import_sensors)
+                if price_import_data:
+                    element = self.network.elements[element_name]
+                    element.price_production = price_import_data
 
-                if CONF_PRICE_EXPORT_SENSOR in element_config:
-                    price_export_data = await self._get_sensor_forecast(element_config[CONF_PRICE_EXPORT_SENSOR])
-                    if price_export_data:
-                        element = self.network.elements[element_name]
-                        element.price_consumption = price_export_data
+            if CONF_PRICE_EXPORT_SENSOR in element_config:
+                price_export_sensors = element_config[CONF_PRICE_EXPORT_SENSOR]
+                price_export_data = await self._get_sensor_forecast(price_export_sensors)
+                if price_export_data:
+                    element = self.network.elements[element_name]
+                    element.price_consumption = price_export_data
 
-            elif element_type in [ELEMENT_TYPE_GENERATOR, ELEMENT_TYPE_LOAD_FORECAST]:
-                # Update forecast data from sensors
-                forecast_sensors = element_config.get(CONF_FORECAST_SENSORS, [])
+            # Handle forecast sensors for any element that has them
+            if CONF_FORECAST_SENSORS in element_config:
+                forecast_sensors = element_config[CONF_FORECAST_SENSORS]
                 if forecast_sensors:
-                    # Get forecast data from all sensors
-                    forecast_data = [
-                        sensor_data
-                        for sensor in forecast_sensors
-                        if (sensor_data := await self._get_sensor_forecast(sensor))
-                    ]
-
+                    forecast_data = await self._get_sensor_forecast(forecast_sensors)
                     if forecast_data:
-                        # Use the first sensor's data
                         element = self.network.elements[element_name]
-                        element.forecast = forecast_data[0]
+                        element.forecast = forecast_data
 
             # Update data from configured sensors
             if CONF_SENSORS in element_config:
@@ -225,23 +258,50 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         # Process sensor data based on element type and sensor configuration
                         await self._process_sensor_data(element_name, element_type, sensor_config, sensor_data)
 
-    async def _get_sensor_forecast(self, element_id: str) -> list[float] | None:
-        """Get forecast data from a sensor entity."""
-        state = self.hass.states.get(element_id)
-        if not state:
-            _LOGGER.warning("Sensor %s not found", element_id)
+    async def _get_sensor_forecast(self, sensor_ids: str | list[str]) -> list[float] | None:
+        """Get forecast data from sensor entity/entities and combine them.
+
+        Args:
+            sensor_ids: Single sensor ID or list of sensor IDs to combine
+
+        Returns:
+            Combined forecast data (sum of all sensors) or None if no valid data
+        """
+        if isinstance(sensor_ids, str):
+            sensor_ids = [sensor_ids]
+
+        if not sensor_ids:
             return None
 
-        # Try to get forecast from attributes first
-        forecast_attr = state.attributes.get("forecast")
-        if forecast_attr and isinstance(forecast_attr, list):
-            try:
-                return [float(x) for x in forecast_attr[:DEFAULT_N_PERIODS]]
-            except (ValueError, TypeError) as ex:
-                _LOGGER.error("Invalid forecast data in sensor %s: %s", element_id, ex)
+        combined_forecast = None
 
-        # Fallback: repeat current state value
-        return self._get_repeated_value(state, element_id)
+        for sensor_id in sensor_ids:
+            state = self.hass.states.get(sensor_id)
+            if not state:
+                _LOGGER.warning("Sensor %s not found", sensor_id)
+                continue
+
+            # Try to get forecast from attributes first
+            forecast_attr = state.attributes.get("forecast")
+            if forecast_attr and isinstance(forecast_attr, list):
+                try:
+                    sensor_forecast = [float(x) for x in forecast_attr[:DEFAULT_N_PERIODS]]
+                except (ValueError, TypeError) as ex:
+                    _LOGGER.error("Invalid forecast data in sensor %s: %s", sensor_id, ex)
+                    # Fall back to current state value when forecast is invalid
+                    sensor_forecast = self._get_repeated_value(state, sensor_id)
+            else:
+                # Fallback: repeat current state value
+                sensor_forecast = self._get_repeated_value(state, sensor_id)
+
+            if sensor_forecast:
+                if combined_forecast is None:
+                    combined_forecast = sensor_forecast
+                else:
+                    # Sum the forecasts element-wise
+                    combined_forecast = [a + b for a, b in zip(combined_forecast, sensor_forecast)]
+
+        return combined_forecast
 
     async def _get_sensor_data(self, sensor_config: dict[str, Any]) -> Any | None:
         """Get data from a sensor entity."""

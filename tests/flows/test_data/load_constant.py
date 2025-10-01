@@ -22,6 +22,6 @@ INVALID_DATA = [
     {
         "description": "Negative power should fail validation",
         "config": {CONF_NAME: "Test Load", CONF_POWER: -500},
-        "error": "too small",
+        "error": "value must be positive",
     },
 ]

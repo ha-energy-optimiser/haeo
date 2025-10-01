@@ -24,8 +24,8 @@ VALID_DATA = [
             CONF_NAME: "Smart Grid",
             CONF_IMPORT_LIMIT: 8000,
             CONF_EXPORT_LIMIT: 5000,
-            CONF_PRICE_IMPORT_SENSOR: "sensor.smart_grid_import_price",
-            CONF_PRICE_EXPORT_SENSOR: "sensor.smart_grid_export_price",
+            CONF_PRICE_IMPORT_SENSOR: ["sensor.smart_grid_import_price"],
+            CONF_PRICE_EXPORT_SENSOR: ["sensor.smart_grid_export_price"],
         },
     },
 ]
@@ -39,6 +39,6 @@ INVALID_DATA = [
     {
         "description": "Negative import limit should fail validation",
         "config": {CONF_NAME: "Test Grid", CONF_IMPORT_LIMIT: -1000},
-        "error": "too small",
+        "error": "value must be positive",
     },
 ]
