@@ -89,7 +89,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up HAEO sensor platform."""
-    coordinator: HaeoDataUpdateCoordinator = config_entry.runtime_data
+    coordinator: HaeoDataUpdateCoordinator | None = getattr(config_entry, "runtime_data", None)
 
     # Register devices with the device registry only if coordinator is available
     if coordinator:
@@ -100,31 +100,34 @@ async def async_setup_entry(
 
     entities: list[SensorEntity] = []
 
-    # Add optimization status and cost sensors (hub-level)
-    entities.append(HaeoOptimizationCostSensor(coordinator, config_entry))
-    entities.append(HaeoOptimizationStatusSensor(coordinator, config_entry))
+    # Add optimization status and cost sensors (hub-level) only if coordinator exists
+    if coordinator:
+        entities.append(HaeoOptimizationCostSensor(coordinator, config_entry))
+        entities.append(HaeoOptimizationStatusSensor(coordinator, config_entry))
 
-    # Add element-specific sensors based on available data
-    participants = config_entry.data.get("participants", {})
-    for element_name, element_config in participants.items():
-        element_type = element_config.get("type", "")
+        # Add element-specific sensors based on available data (only if coordinator exists)
+        participants = config_entry.data.get("participants", {})
+        for element_name, element_config in participants.items():
+            element_type = element_config.get("type", "")
 
-        # Create a helper function to check if we have optimization data for this entity
-        def has_data_type(data_type: str) -> bool:
-            if not coordinator.optimization_result:
-                return True  # Assume we'll have it when optimization runs
-            solution = coordinator.optimization_result.get("solution", {})
-            return f"{element_name}_{data_type}" in solution
+            # Create a helper function to check if we have optimization data for this entity
+            def has_data_type(data_type: str) -> bool:
+                if not coordinator.optimization_result:
+                    return True  # Assume we'll have it when optimization runs
+                solution = coordinator.optimization_result.get("solution", {})
+                return f"{element_name}_{data_type}" in solution
 
-        # Add power consumption sensor if entity has this capability
-        if has_data_type(ATTR_POWER):
-            entities.append(HaeoElementPowerSensor(coordinator, config_entry, element_name, element_type))
+            # Add power consumption sensor if entity has this capability
+            if has_data_type(ATTR_POWER):
+                entities.append(HaeoElementPowerSensor(coordinator, config_entry, element_name, element_type))
 
-        # Add energy sensor if entity has energy state (like batteries)
-        if has_data_type(ATTR_ENERGY):
-            entities.append(HaeoElementEnergySensor(coordinator, config_entry, element_name, element_type))
+            # Add energy sensor if entity has energy state (like batteries)
+            if has_data_type(ATTR_ENERGY):
+                entities.append(HaeoElementEnergySensor(coordinator, config_entry, element_name, element_type))
 
-    async_add_entities(entities)
+    # Only add entities if we have a coordinator
+    if entities:
+        async_add_entities(entities)
 
 
 class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity):

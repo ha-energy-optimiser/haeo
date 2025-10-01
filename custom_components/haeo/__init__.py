@@ -26,24 +26,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaeoConfigEntry) -> bool
     """Set up Home Assistant Energy Optimization from a config entry."""
     _LOGGER.info("Setting up HAEO integration")
 
-    # Initialize the data coordinator
+    # Store coordinator in runtime data first (required for platform setup)
     coordinator = HaeoDataUpdateCoordinator(hass, entry)
-
-    try:
-        # Fetch initial data
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as ex:
-        _LOGGER.error("Failed to initialize HAEO integration: %s", ex)
-        raise ConfigEntryNotReady from ex
-
-    # Store coordinator in runtime data
     entry.runtime_data = coordinator
 
     # Set up config entry update listener
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
-    # Set up platforms
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        # Fetch initial data
+        await coordinator.async_refresh()
+    except Exception as ex:
+        _LOGGER.error("Failed to initialize HAEO integration: %s", ex)
+        raise ConfigEntryNotReady from ex
 
     _LOGGER.info("HAEO integration setup complete")
     return True

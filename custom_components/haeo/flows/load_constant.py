@@ -14,7 +14,7 @@ from ..const import (
     CONF_POWER,
     CONF_ELEMENT_TYPE,
 )
-from . import validate_element_name, validate_positive_number, validate_power_value
+from . import validate_element_name, validate_power_value
 
 _LOGGER = logging.getLogger(__name__)
 

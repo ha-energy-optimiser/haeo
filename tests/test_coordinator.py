@@ -20,6 +20,7 @@ from custom_components.haeo.const import (
     CONF_PARTICIPANTS,
     DOMAIN,
     ELEMENT_TYPE_BATTERY,
+    ELEMENT_TYPE_CONNECTION,
     ELEMENT_TYPE_GRID,
     ELEMENT_TYPE_LOAD_FORECAST,
     OPTIMIZATION_STATUS_SUCCESS,
@@ -58,10 +59,11 @@ def mock_config_entry():
                     CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
                     CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
                     # For tests, use constant pricing to avoid sensor setup complexity
-                    "price_import": [0.1] * 576,  # 576 periods
-                    "price_export": [0.05] * 576,  # 576 periods
+                    "price_import": [0.1] * DEFAULT_N_PERIODS,
+                    "price_export": [0.05] * DEFAULT_N_PERIODS,
                 },
                 "test_connection": {
+                    CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION,
                     CONF_SOURCE: "test_battery",
                     CONF_TARGET: "test_grid",
                     CONF_MAX_POWER: 5000,
@@ -340,9 +342,9 @@ async def test_build_network_with_grid_sensor_pricing(hass: HomeAssistant):
 
     coordinator = HaeoDataUpdateCoordinator(hass, config_entry)
 
-    # Mock sensor forecast data with correct number of periods (24)
+    # Mock sensor forecast data with correct number of periods (DEFAULT_N_PERIODS)
     with patch.object(coordinator, "_get_sensor_forecast") as mock_forecast:
-        mock_forecast.return_value = [0.1] * 24  # 24 periods
+        mock_forecast.return_value = [0.1] * DEFAULT_N_PERIODS
 
         await coordinator._build_network()
 
@@ -403,17 +405,27 @@ async def test_build_network_with_mixed_pricing(hass: HomeAssistant):
 
     coordinator = HaeoDataUpdateCoordinator(hass, config_entry)
 
-    # Mock sensor forecast data for import (24 periods)
+    # Mock sensor forecast data for import and export (576 periods)
     with patch.object(coordinator, "_get_sensor_forecast") as mock_forecast:
-        mock_forecast.return_value = [0.1] * 24  # 24 periods
+
+        def mock_forecast_side_effect(sensor_id):
+            if sensor_id == "sensor.import_price":
+                return [0.1] * DEFAULT_N_PERIODS
+            elif sensor_id == "sensor.export_price":
+                return [0.05] * DEFAULT_N_PERIODS
+            return None
+
+        mock_forecast.side_effect = mock_forecast_side_effect
 
         await coordinator._build_network()
 
         assert coordinator.network is not None
         assert "test_grid" in coordinator.network.elements
 
-        # Verify sensor was called for import but not export
-        mock_forecast.assert_called_once_with("sensor.import_price")
+        # Verify sensors were called for both import and export
+        assert mock_forecast.call_count == 2
+        mock_forecast.assert_any_call("sensor.import_price")
+        mock_forecast.assert_any_call("sensor.export_price")
 
 
 async def test_build_network_element_creation_error(hass: HomeAssistant):
@@ -488,32 +500,7 @@ async def test_collect_sensor_data_with_load_forecast_sensors(hass: HomeAssistan
             CONF_PARTICIPANTS: {
                 "test_load": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_LOAD_FORECAST,
-                    "forecast": [
-                        100,
-                        200,
-                        150,
-                        175,
-                        125,
-                        150,
-                        200,
-                        180,
-                        160,
-                        140,
-                        120,
-                        100,
-                        110,
-                        130,
-                        150,
-                        170,
-                        190,
-                        210,
-                        200,
-                        180,
-                        160,
-                        140,
-                        120,
-                        100,
-                    ],  # 24 periods
+                    "forecast": [100] * DEFAULT_N_PERIODS,  # Default number of periods
                     CONF_FORECAST_SENSORS: ["sensor.load_forecast"],
                 }
             },
@@ -528,7 +515,7 @@ async def test_collect_sensor_data_with_load_forecast_sensors(hass: HomeAssistan
 
     # Mock sensor forecast data
     with patch.object(coordinator, "_get_sensor_forecast") as mock_forecast:
-        mock_forecast.return_value = [100] * 24  # 24 periods
+        mock_forecast.return_value = [100] * DEFAULT_N_PERIODS  # Default number of periods
 
         await coordinator._collect_sensor_data()
 
