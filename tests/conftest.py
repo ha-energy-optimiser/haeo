@@ -1,7 +1,6 @@
 """Test configuration and fixtures."""
 
 import pytest
-from unittest.mock import MagicMock
 
 from custom_components.haeo.const import (
     DOMAIN,
