@@ -38,12 +38,6 @@ LOAD_PARTICIPANT_SCENARIOS = [
 ]
 
 
-@pytest.fixture
-def valid_load_data():
-    """Get valid load test data."""
-    return LOAD_VALID_DATA.copy()
-
-
 async def test_load_schema_basic_validation(hass: HomeAssistant):
     """Test basic load schema validation."""
     schema = get_constant_load_schema()

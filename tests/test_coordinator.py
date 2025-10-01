@@ -49,6 +49,7 @@ def mock_config_entry():
                 "test_battery": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY,
                     CONF_CAPACITY: 10000,
+                    CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
                 },
                 "test_grid": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
@@ -56,6 +57,9 @@ def mock_config_entry():
                     CONF_EXPORT_LIMIT: 5000,
                     CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
                     CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    # For tests, use constant pricing to avoid sensor setup complexity
+                    "price_import": [0.1] * 576,  # 576 periods
+                    "price_export": [0.05] * 576,  # 576 periods
                 },
                 "test_connection": {
                     CONF_SOURCE: "test_battery",
@@ -81,6 +85,9 @@ async def test_coordinator_initialization(hass: HomeAssistant, mock_config_entry
 
 async def test_build_network(hass: HomeAssistant, mock_config_entry):
     """Test building the network from configuration."""
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     await coordinator._build_network()
@@ -112,7 +119,7 @@ async def test_get_sensor_forecast_fallback_to_state(hass: HomeAssistant, mock_c
     result = await coordinator._get_sensor_forecast("sensor.test")
 
     assert result is not None
-    assert len(result) == 24  # DEFAULT_N_PERIODS
+    assert len(result) == 576  # DEFAULT_N_PERIODS
     assert all(x == 150.0 for x in result)
 
 
@@ -129,6 +136,9 @@ async def test_get_sensor_forecast_missing_sensor(hass: HomeAssistant, mock_conf
 @patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator._run_optimization")
 async def test_update_data_success(mock_optimize, hass: HomeAssistant, mock_config_entry):
     """Test successful data update."""
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     # Mock optimization result - now returns only cost
@@ -183,6 +193,9 @@ async def test_build_network_with_battery_sensor(hass: HomeAssistant):
 @patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator._run_optimization")
 async def test_update_data_failure(mock_optimize, hass: HomeAssistant, mock_config_entry):
     """Test failed data update."""
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     # Mock optimization failure
@@ -711,6 +724,9 @@ def test_run_optimization_failure(hass: HomeAssistant, mock_config_entry):
 
 async def test_update_data_network_build_failure(hass: HomeAssistant, mock_config_entry):
     """Test update data when network building fails."""
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     # Mock network building to fail
@@ -723,6 +739,9 @@ async def test_update_data_network_build_failure(hass: HomeAssistant, mock_confi
 
 async def test_update_data_sensor_collection_failure(hass: HomeAssistant, mock_config_entry):
     """Test update data when sensor collection fails."""
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     # Mock successful network build but failing sensor collection
@@ -803,7 +822,7 @@ async def test_get_sensor_forecast_with_invalid_data(hass: HomeAssistant, mock_c
 
     # Should handle invalid data gracefully and fall back to current state value repeated
     assert result is not None
-    assert len(result) == 24  # DEFAULT_N_PERIODS
+    assert len(result) == 576  # DEFAULT_N_PERIODS
     assert all(x == 100.0 for x in result)  # Should fall back to current state value
 
 

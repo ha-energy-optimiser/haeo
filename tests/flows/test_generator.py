@@ -76,12 +76,6 @@ GENERATOR_PARTICIPANT_SCENARIOS = [
 ]
 
 
-@pytest.fixture
-def valid_generator_data():
-    """Get valid generator test data."""
-    return GENERATOR_VALID_DATA.copy()
-
-
 async def test_generator_schema_basic_validation(hass: HomeAssistant):
     """Test basic generator schema validation."""
     schema = get_generator_schema()

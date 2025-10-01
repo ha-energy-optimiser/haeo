@@ -34,12 +34,6 @@ LOAD_PARTICIPANT_SCENARIOS = [
 ]
 
 
-@pytest.fixture
-def valid_load_data():
-    """Get valid load test data."""
-    return LOAD_VARIABLE_DATA.copy()
-
-
 async def test_load_schema_variable_type(hass: HomeAssistant):
     """Test load schema with variable type."""
     schema = get_forecast_load_schema()

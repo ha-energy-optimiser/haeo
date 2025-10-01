@@ -1,6 +1,7 @@
-"""Test data and validation for battery flow configuration."""
+"""Test battery config flow."""
 
 import pytest
+from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_NAME
 
@@ -9,6 +10,7 @@ from custom_components.haeo.flows.battery import (
     create_battery_participant,
 )
 from custom_components.haeo.const import (
+    DOMAIN,
     ELEMENT_TYPE_BATTERY,
     CONF_CAPACITY,
     CONF_CURRENT_CHARGE_SENSOR,
@@ -17,6 +19,8 @@ from custom_components.haeo.const import (
     CONF_MAX_CHARGE_POWER,
     CONF_MAX_DISCHARGE_POWER,
     CONF_EFFICIENCY,
+    CONF_CHARGE_COST,
+    CONF_DISCHARGE_COST,
 )
 
 
@@ -27,6 +31,8 @@ BATTERY_VALID_DATA = {
     CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
     CONF_MAX_CHARGE_POWER: 5000,
     CONF_MAX_DISCHARGE_POWER: 5000,
+    CONF_CHARGE_COST: 0.0,
+    CONF_DISCHARGE_COST: 0.0,
 }
 
 BATTERY_DETAILED_DATA = {
@@ -38,6 +44,8 @@ BATTERY_DETAILED_DATA = {
     CONF_MAX_CHARGE_POWER: 5000,
     CONF_MAX_DISCHARGE_POWER: 5000,
     CONF_EFFICIENCY: 0.95,
+    CONF_CHARGE_COST: 0.05,
+    CONF_DISCHARGE_COST: 0.03,
 }
 
 BATTERY_INVALID_DATA = [
@@ -48,6 +56,8 @@ BATTERY_INVALID_DATA = [
             CONF_CURRENT_CHARGE_SENSOR: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,
             CONF_MAX_DISCHARGE_POWER: 5000,
+            CONF_CHARGE_COST: 0.0,
+            CONF_DISCHARGE_COST: 0.0,
         },
         "cannot be empty",
     ),
@@ -58,6 +68,8 @@ BATTERY_INVALID_DATA = [
             CONF_CURRENT_CHARGE_SENSOR: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,
             CONF_MAX_DISCHARGE_POWER: 5000,
+            CONF_CHARGE_COST: 0.0,
+            CONF_DISCHARGE_COST: 0.0,
         },
         "too small",
     ),
@@ -75,6 +87,8 @@ BATTERY_PARTICIPANT_SCENARIOS = [
             CONF_EFFICIENCY: 0.95,
             CONF_MIN_CHARGE_PERCENTAGE: 10,
             CONF_MAX_CHARGE_PERCENTAGE: 90,
+            CONF_CHARGE_COST: 0.05,
+            CONF_DISCHARGE_COST: 0.03,
         },
         0.95,
     ),
@@ -86,16 +100,12 @@ BATTERY_PARTICIPANT_SCENARIOS = [
             CONF_CURRENT_CHARGE_SENSOR: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,
             CONF_MAX_DISCHARGE_POWER: 5000,
+            CONF_CHARGE_COST: 0.0,
+            CONF_DISCHARGE_COST: 0.0,
         },
         None,
     ),
 ]
-
-
-@pytest.fixture
-def valid_battery_data():
-    """Get valid battery test data."""
-    return BATTERY_VALID_DATA.copy()
 
 
 # Battery-specific test functions
@@ -170,3 +180,109 @@ async def test_battery_participant_with_defaults(hass: HomeAssistant):
     assert participant[CONF_CURRENT_CHARGE_SENSOR] == "sensor.battery_level"
     assert participant[CONF_MAX_CHARGE_POWER] == 2000
     assert participant[CONF_MAX_DISCHARGE_POWER] == 2000
+
+
+@pytest.fixture
+def mock_setup_entry():
+    """Mock setup entry."""
+    from unittest.mock import patch
+
+    with patch("custom_components.haeo.async_setup_entry") as mock:
+        mock.return_value = True
+        yield mock
+
+
+async def test_user_flow_success(hass: HomeAssistant, mock_setup_entry):
+    """Test successful user flow."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    from homeassistant.config_entries import FlowResult
+
+    assert result["type"] == FlowResult.FORM
+    assert result["step_id"] == "user"
+
+    # Test form submission
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_NAME: "Test Battery",
+            CONF_CAPACITY: 10000,
+            CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
+            CONF_MAX_CHARGE_POWER: 5000,
+            CONF_MAX_DISCHARGE_POWER: 5000,
+        },
+    )
+    assert result["type"] == FlowResult.CREATE_ENTRY
+    assert result["title"] == "Test Battery"
+    assert result["data"]["name"] == "Test Battery"
+    assert result["data"]["capacity"] == 10000
+
+
+async def test_user_flow_invalid_data(hass: HomeAssistant):
+    """Test user flow with invalid data."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    from homeassistant.config_entries import FlowResult
+
+    assert result["type"] == FlowResult.FORM
+
+    # Test form submission with invalid data (empty name)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_NAME: "",  # Invalid empty name
+            CONF_CAPACITY: 10000,
+            CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
+            CONF_MAX_CHARGE_POWER: 5000,
+            CONF_MAX_DISCHARGE_POWER: 5000,
+        },
+    )
+    assert result["type"] == FlowResult.FORM
+    assert result["errors"] == {"name": "cannot_be_empty"}
+
+
+async def test_user_flow_negative_capacity(hass: HomeAssistant):
+    """Test user flow with negative capacity."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    from homeassistant.config_entries import FlowResult
+
+    assert result["type"] == FlowResult.FORM
+
+    # Test form submission with invalid data (negative capacity)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_NAME: "Test Battery",
+            CONF_CAPACITY: -1000,  # Invalid negative capacity
+            CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
+            CONF_MAX_CHARGE_POWER: 5000,
+            CONF_MAX_DISCHARGE_POWER: 5000,
+        },
+    )
+    assert result["type"] == FlowResult.FORM
+    assert result["errors"] == {"capacity": "too_small"}
+
+
+async def test_user_flow_optional_fields(hass: HomeAssistant, mock_setup_entry):
+    """Test user flow with optional fields."""
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    from homeassistant.config_entries import FlowResult
+
+    assert result["type"] == FlowResult.FORM
+
+    # Test form submission with optional fields
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_NAME: "Advanced Battery",
+            CONF_CAPACITY: 10000,
+            CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
+            CONF_MAX_CHARGE_POWER: 5000,
+            CONF_MAX_DISCHARGE_POWER: 5000,
+            CONF_MIN_CHARGE_PERCENTAGE: 10,
+            CONF_MAX_CHARGE_PERCENTAGE: 90,
+            CONF_EFFICIENCY: 0.95,
+        },
+    )
+    assert result["type"] == FlowResult.CREATE_ENTRY
+    assert result["data"]["efficiency"] == 0.95
+    assert result["data"]["min_charge_percentage"] == 10
+    assert result["data"]["max_charge_percentage"] == 90

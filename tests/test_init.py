@@ -1,8 +1,7 @@
 """Test the HAEO integration."""
 
 import pytest
-from unittest.mock import patch
-from homeassistant.config_entries import ConfigEntry
+from unittest.mock import AsyncMock, patch
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -60,56 +59,79 @@ def mock_config_entry():
     )
 
 
-async def test_setup_entry(hass: HomeAssistant, mock_config_entry: ConfigEntry):
+async def test_setup_entry(hass: HomeAssistant, mock_config_entry):
     """Test setting up the integration."""
-    with (
-        patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator.async_config_entry_first_refresh"),
-        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-    ):
+    mock_config_entry.add_to_hass(hass)
+
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
+    with patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator") as mock_coordinator:
+        # Mock the coordinator to avoid complex setup
+        mock_instance = AsyncMock()
+        mock_coordinator.return_value = mock_instance
+
         result = await async_setup_entry(hass, mock_config_entry)
 
         assert result is True
         assert mock_config_entry.runtime_data is not None
+        mock_coordinator.assert_called_once()
 
 
-async def test_unload_entry(hass: HomeAssistant, mock_config_entry: ConfigEntry):
+async def test_unload_entry(hass: HomeAssistant, mock_config_entry):
     """Test unloading the integration."""
-    # First set up the integration
-    with (
-        patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator.async_config_entry_first_refresh"),
-        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-        patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", return_value=True),
-    ):
+    mock_config_entry.add_to_hass(hass)
+
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
+    with patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator") as mock_coordinator:
+        # Set up the integration first
+        mock_instance = AsyncMock()
+        mock_coordinator.return_value = mock_instance
+
         await async_setup_entry(hass, mock_config_entry)
 
         # Now test unloading
-        result = await async_unload_entry(hass, mock_config_entry)
+        with patch("homeassistant.config_entries.async_unload_platforms", return_value=True) as mock_unload:
+            result = await async_unload_entry(hass, mock_config_entry)
 
-        assert result is True
+            assert result is True
+            mock_unload.assert_called_once()
 
 
-async def test_setup_entry_failure(hass: HomeAssistant, mock_config_entry: ConfigEntry):
+async def test_setup_entry_failure(hass: HomeAssistant, mock_config_entry):
     """Test setup entry failure."""
-    with patch(
-        "custom_components.haeo.coordinator.HaeoDataUpdateCoordinator.async_config_entry_first_refresh",
-        side_effect=Exception("Test error"),
-    ):
+    mock_config_entry.add_to_hass(hass)
+
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
+    with patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator") as mock_coordinator:
+        # Mock coordinator to raise exception
+        mock_coordinator.side_effect = Exception("Test error")
+
         with pytest.raises(Exception):
             await async_setup_entry(hass, mock_config_entry)
 
 
-async def test_reload_entry(hass: HomeAssistant, mock_config_entry: ConfigEntry):
+async def test_reload_entry(hass: HomeAssistant, mock_config_entry):
     """Test reloading the integration."""
-    with (
-        patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator.async_config_entry_first_refresh"),
-        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-        patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", return_value=True),
-    ):
-        # First set up the integration
+    mock_config_entry.add_to_hass(hass)
+
+    # Set up sensor state for battery
+    hass.states.async_set("sensor.battery_charge", "50", {})
+
+    with patch("custom_components.haeo.coordinator.HaeoDataUpdateCoordinator") as mock_coordinator:
+        # Set up the integration first
+        mock_instance = AsyncMock()
+        mock_coordinator.return_value = mock_instance
+
         await async_setup_entry(hass, mock_config_entry)
 
         # Now test reloading
-        await async_reload_entry(hass, mock_config_entry)
+        with patch("homeassistant.config_entries.async_unload_platforms", return_value=True):
+            await async_reload_entry(hass, mock_config_entry)
 
-        # Verify the integration was reloaded (coordinator should be recreated)
-        assert mock_config_entry.runtime_data is not None
+            # Verify the integration was reloaded (coordinator should be recreated)
+            assert mock_config_entry.runtime_data is not None

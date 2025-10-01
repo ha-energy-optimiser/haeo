@@ -29,12 +29,6 @@ NET_PARTICIPANT_SCENARIOS = [
 ]
 
 
-@pytest.fixture
-def valid_net_data():
-    """Get valid net test data."""
-    return NET_VALID_DATA.copy()
-
-
 async def test_net_schema_basic_validation(hass: HomeAssistant):
     """Test basic net schema validation."""
     schema = get_net_schema()

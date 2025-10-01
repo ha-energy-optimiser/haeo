@@ -90,12 +90,6 @@ CONNECTION_PARTICIPANT_SCENARIOS = [
 ]
 
 
-@pytest.fixture
-def valid_connection_data():
-    """Get valid connection test data."""
-    return CONNECTION_VALID_DATA.copy()
-
-
 async def test_connection_schema_basic_validation(hass: HomeAssistant):
     """Test basic connection schema validation."""
     schema = get_connection_schema(MOCK_PARTICIPANTS)

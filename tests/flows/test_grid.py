@@ -51,12 +51,6 @@ GRID_PARTICIPANT_SCENARIOS = [
 ]
 
 
-@pytest.fixture
-def valid_grid_data():
-    """Get valid grid test data."""
-    return GRID_VALID_DATA.copy()
-
-
 async def test_grid_schema_basic_validation(hass: HomeAssistant):
     """Test basic grid schema validation."""
     schema = get_grid_schema()

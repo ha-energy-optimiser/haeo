@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_POWER,
+    CONF_ELEMENT_TYPE,
     DOMAIN,
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_GRID,
@@ -115,9 +116,9 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Add entities from participants
         for element_name, element_config in participants.items():
-            element_type = element_config["type"]
+            element_type = element_config[CONF_ELEMENT_TYPE]
             element_params = element_config.copy()
-            element_params.pop("type", None)  # Remove type key as it's not a constructor parameter
+            element_params.pop(CONF_ELEMENT_TYPE, None)  # Remove type key as it's not a constructor parameter
 
             # Remove sensor configuration parameters as they're not model constructor parameters
             sensor_config_keys = [
@@ -183,7 +184,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         participants = self.config.get("participants", {})
 
         for element_name, element_config in participants.items():
-            element_type = element_config["type"]
+            element_type = element_config[CONF_ELEMENT_TYPE]
 
             # Update dynamic sensor data for all entity types with forecast/price sensors
             if element_type == ELEMENT_TYPE_GRID:
