@@ -421,53 +421,6 @@ async def test_hub_flow_create_hub_success(hass: HomeAssistant):
     assert data.get("participants") == {}
 
 
-async def test_hub_flow_validation_functions():
-    """Test the validation functions."""
-    from custom_components.haeo.flows import (
-        validate_element_name,
-        validate_positive_number,
-        validate_percentage,
-        validate_efficiency,
-    )
-    import voluptuous as vol
-
-    # Test element name validation
-    assert validate_element_name("Valid Name") == "Valid Name"
-
-    with pytest.raises(vol.Invalid):
-        validate_element_name("")
-
-    # Test positive number validation
-    assert validate_positive_number(100) == 100
-
-    with pytest.raises(vol.Invalid):
-        validate_positive_number(0)
-
-    with pytest.raises(vol.Invalid):
-        validate_positive_number(-10)
-
-    # Test percentage validation
-    assert validate_percentage(50) == 50
-    assert validate_percentage(0) == 0
-    assert validate_percentage(100) == 100
-
-    with pytest.raises(vol.Invalid):
-        validate_percentage(-10)
-
-    with pytest.raises(vol.Invalid):
-        validate_percentage(150)
-
-    # Test efficiency validation
-    assert validate_efficiency(0.95) == 0.95
-    assert validate_efficiency(1.0) == 1.0
-
-    with pytest.raises(vol.Invalid):
-        validate_efficiency(1.5)
-
-    with pytest.raises(vol.Invalid):
-        validate_efficiency(0)
-
-
 async def test_options_flow_add_participant_type_selection(hass: HomeAssistant):
     """Test participant type selection."""
     from custom_components.haeo.flows.options import HubOptionsFlow

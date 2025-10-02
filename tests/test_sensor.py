@@ -566,3 +566,26 @@ def test_connection_sensor_device_info(mock_coordinator, mock_config_entry):
     device_info = sensor.device_info
 
     assert device_info.get("model") == "Energy Optimization Connection"
+
+
+def test_sensor_unavailable_when_sensor_data_missing(mock_config_entry):
+    """Test that sensors show as unavailable when underlying sensor data is missing."""
+    # Create a coordinator with missing sensor data
+    coordinator = Mock(spec=HaeoDataUpdateCoordinator)
+    coordinator.last_update_success = True  # Required for coordinator availability
+    coordinator.optimization_status = OPTIMIZATION_STATUS_FAILED
+    coordinator.optimization_result = None
+    coordinator.get_element_data = Mock(return_value=None)  # Simulate missing element data
+
+    # Create a power sensor
+    sensor = HaeoElementPowerSensor(coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
+
+    # The sensor should be unavailable when element data is missing
+    assert not sensor.available
+
+    # Test optimization status sensor
+    status_sensor = HaeoOptimizationStatusSensor(coordinator, mock_config_entry)
+
+    # Should be available since optimization status is set (even if failed)
+    assert status_sensor.available
+    assert status_sensor.native_value == OPTIMIZATION_STATUS_FAILED

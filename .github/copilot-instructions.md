@@ -131,6 +131,7 @@ uv lock --upgrade                      # Update lock file
 - **Type Checking**: MyPy
 - **Testing**: pytest with plain functions and fixtures
 - **Language**: American English for all code, comments, and documentation (use sentence case, including titles)
+- **Units**: Use SI units (seconds, watts, watt-hours, etc.) throughout all calculations and internal data structures. Only convert to user-friendly units (hours, minutes, kW, kWh) when displaying to users or accepting user input.
 
 ### Writing Style Guidelines
 

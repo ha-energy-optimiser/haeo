@@ -38,6 +38,7 @@ def power_field(description: str, optional: bool = False, default: float = None)
         default=default,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.POWER, "constant"),
             "schema": vol.All(
                 vol.Coerce(float),
                 vol.Range(min=0, min_included=True, msg="Value must be positive"),
@@ -56,6 +57,7 @@ def power_sensors_field(description: str, optional: bool = False) -> Sequence[st
         default_factory=list,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.POWER, "sensor"),
             "schema": EntitySelector(EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.POWER])),
             "optional": optional,
         },
@@ -69,6 +71,7 @@ def power_forecast_sensors_field(description: str, optional: bool = False) -> Se
         metadata={
             "default_factory": list,
             "description": description,
+            "field_type": (SensorDeviceClass.POWER, "forecast"),
             "schema": EntitySelector(
                 EntitySelectorConfig(domain="sensor", multiple=True, device_class=[SensorDeviceClass.POWER])
             ),
@@ -83,6 +86,7 @@ def power_flow_field(description: str, optional: bool = False, default: float = 
         default=default,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.POWER, "constant"),
             "schema": vol.All(
                 vol.Coerce(float),
                 NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="W")),
@@ -98,6 +102,7 @@ def energy_field(description: str, optional: bool = False, default: float = None
         default=default,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.ENERGY, "constant"),
             "schema": vol.All(
                 vol.Coerce(float),
                 vol.Range(min=0, min_included=True, msg="Value must be positive"),
@@ -116,6 +121,7 @@ def energy_sensors_field(description: str, optional: bool = False) -> Sequence[s
         default_factory=list,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.ENERGY, "sensor"),
             "schema": EntitySelector(
                 EntitySelectorConfig(
                     domain="sensor",
@@ -134,6 +140,7 @@ def energy_forecast_sensors_field(description: str, optional: bool = False) -> S
         default_factory=list,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.ENERGY, "forecast"),
             "schema": EntitySelector(
                 EntitySelectorConfig(domain="sensor", multiple=True, device_class=[SensorDeviceClass.ENERGY])
             ),
@@ -148,6 +155,7 @@ def price_field(description: str, optional: bool = False) -> float:
         default=None,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.MONETARY, "constant"),
             "schema": vol.All(
                 vol.Coerce(float),
                 NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="$/kWh")),
@@ -163,6 +171,7 @@ def price_sensors_field(description: str, optional: bool = False) -> Sequence[st
         default_factory=list,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.MONETARY, "sensor"),
             "schema": EntitySelector(
                 EntitySelectorConfig(
                     domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]
@@ -179,6 +188,7 @@ def price_forecast_sensors_field(description: str, optional: bool = False) -> Se
         default_factory=list,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.MONETARY, "forecast"),
             "schema": EntitySelector(
                 EntitySelectorConfig(
                     domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]
@@ -195,6 +205,20 @@ def percentage_field(description: str, optional: bool = False, default: float = 
         default=default,
         metadata={
             "description": description,
+            "field_type": ("%", "constant"),
+            "schema": vol.All(vol.Coerce(float), vol.Range(min=0, max=100, msg="Value must be between 0 and 100")),
+            "optional": optional,
+        },
+    )
+
+
+def battery_soc_field(description: str, optional: bool = False, default: float = None) -> float:
+    """Field for battery state of charge percentage."""
+    return field(
+        default=default,
+        metadata={
+            "description": description,
+            "field_type": (SensorDeviceClass.BATTERY, "constant"),
             "schema": vol.All(vol.Coerce(float), vol.Range(min=0, max=100, msg="Value must be between 0 and 100")),
             "optional": optional,
         },
@@ -207,6 +231,7 @@ def battery_soc_sensor_field(description: str, optional: bool = False) -> Sequen
         default_factory=list,
         metadata={
             "description": description,
+            "field_type": (SensorDeviceClass.BATTERY, "sensor"),
             "schema": EntitySelector(EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.BATTERY])),
             "optional": optional,
         },
@@ -219,6 +244,7 @@ def boolean_field(description: str, optional: bool = False, default: bool = None
         default=default,
         metadata={
             "description": description,
+            "field_type": ("boolean", "constant"),
             "schema": bool,
             "optional": optional,
         },

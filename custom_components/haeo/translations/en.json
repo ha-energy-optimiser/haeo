@@ -14,9 +14,11 @@
     "step": {
       "user": {
         "title": "HAEO Network Setup",
-        "description": "Create a new HAEO optimization network. After creating the network, you can add individual devices like batteries, grid connections, loads, and generators through the network's configuration options.",
+        "description": "Create a new HAEO optimization network. Configure the optimization horizon (how far into the future to optimize) and time period (how often to make optimization decisions). After creating the network, you can add individual devices like batteries, grid connections, loads, and generators through the network's configuration options.",
         "data": {
-          "name": "Network Name"
+          "name": "Network Name",
+          "horizon_hours": "Optimization Horizon (hours)",
+          "period_minutes": "Time Period (minutes)"
         }
       }
     },

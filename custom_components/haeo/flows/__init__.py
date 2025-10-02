@@ -12,7 +12,6 @@ import voluptuous as vol
 
 from ..const import CONF_SOURCE, CONF_TARGET
 
-
 _LOGGER = logging.getLogger(__name__)
 
 

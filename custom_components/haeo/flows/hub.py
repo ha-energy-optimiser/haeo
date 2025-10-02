@@ -53,7 +53,11 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
 
         # Show form
-        data_schema = vol.Schema({vol.Required(CONF_NAME): vol.All(str, validate_element_name)})
+        data_schema = vol.Schema({
+            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
+            vol.Optional(CONF_HORIZON, default=DEFAULT_HORIZON): vol.All(int, vol.Range(min=1, max=168, msg="Horizon must be between 1 and 168 hours")),
+            vol.Optional(CONF_PERIOD, default=DEFAULT_PERIOD_MINUTES): vol.All(int, vol.Range(min=1, max=60, msg="Period must be between 1 and 60 minutes")),
+        })
 
         return self.async_show_form(
             step_id="user",

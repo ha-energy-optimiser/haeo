@@ -31,10 +31,10 @@ class Generator(Element):
             period=period,
             n_periods=n_periods,
             power_production=[
-                LpVariable(name=f"{name}_power_production_{i}", lowBound=0, upBound=v) for i, v in enumerate(forecast)
+                LpVariable(name=f"{name}_power_{i}", lowBound=0, upBound=v) for i, v in enumerate(forecast)
             ]
             if curtailment
-            else None,
+            else forecast,
             # ones * price will either be a noop if price is a sequence or will create a sequence if price is a scalar
             price_production=(ones * price_production).tolist() if price_production is not None else None,
             price_consumption=(ones * price_consumption).tolist() if price_consumption is not None else None,

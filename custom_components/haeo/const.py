@@ -73,9 +73,12 @@ CONF_SENSORS = "sensors"
 CONF_SENSOR_ENTITY_ID = "entity_id"
 CONF_SENSOR_ATTRIBUTE = "attribute"
 
-# Default values
-DEFAULT_PERIOD = 300  # 5 minutes in seconds
-DEFAULT_N_PERIODS = 576  # 48 hours in 5 minute steps
+# Horizon and period configuration
+CONF_HORIZON_HOURS = "horizon_hours"
+CONF_PERIOD_MINUTES = "period_minutes"
+DEFAULT_HORIZON_HOURS = 48  # 48 hours default
+DEFAULT_PERIOD_MINUTES = 5  # 5 minutes default
+
 
 # Update intervals
 DEFAULT_UPDATE_INTERVAL = 300  # 5 minutes in seconds

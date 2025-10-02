@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Literal
 from dataclasses import dataclass
 
-from .fields import name_field, energy_field, battery_soc_sensor_field, percentage_field, power_field, price_field
+from .fields import (
+    name_field,
+    energy_field,
+    battery_soc_sensor_field,
+    battery_soc_field,
+    percentage_field,
+    power_field,
+    price_field,
+)
 
 
 @dataclass
@@ -19,8 +27,8 @@ class BatteryConfig:
     capacity: float = energy_field("Battery capacity in Wh")
     current_charge_sensor: str = battery_soc_sensor_field("Sensor for current battery charge level in Wh/kWh or %")
 
-    min_charge_percentage: float = percentage_field("Minimum charge percentage", default=10)
-    max_charge_percentage: float = percentage_field("Maximum charge percentage", default=90)
+    min_charge_percentage: float = battery_soc_field("Minimum charge percentage", default=10)
+    max_charge_percentage: float = battery_soc_field("Maximum charge percentage", default=90)
     efficiency: float = percentage_field("Efficiency", default=99)
 
     max_charge_power: float | None = power_field("Maximum charging power rate in W", optional=True)
