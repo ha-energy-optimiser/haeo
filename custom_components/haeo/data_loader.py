@@ -312,7 +312,7 @@ class DataLoader:
             Dictionary with field_name and field_value, or None if transformation fails
         """
         # Handle battery current charge sensor -> initial charge percentage conversion
-        if field_name == "current_charge_sensor":
+        if field_name == "current_charge":
             capacity = element_config.get("capacity")
             if capacity and loaded_value is not None:
                 # loaded_value should be a single value for current charge

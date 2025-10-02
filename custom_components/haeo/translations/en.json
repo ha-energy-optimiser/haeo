@@ -65,7 +65,7 @@
           "name": "Battery Name",
           "capacity": "Capacity",
           "initial_charge_percentage": "Initial Charge",
-          "current_charge_sensor": "Current Charge Sensor (Optional)",
+          "current_charge": "Current Charge Sensor (Optional)",
           "min_charge_percentage": "Minimum Charge Level",
           "max_charge_percentage": "Maximum Charge Level",
           "max_charge_power": "Maximum Charge Power",
@@ -82,10 +82,12 @@
           "name": "Grid Connection Name",
           "import_limit": "Import Limit (Optional)",
           "export_limit": "Export Limit (Optional)",
-          "price_import": "Import Price (Optional)",
-          "price_export": "Export Price (Optional)",
-          "price_import_sensor": "Import Price Sensor",
-          "price_export_sensor": "Export Price Sensor"
+          "import_price": "Import Price (Optional)",
+          "export_price": "Export Price (Optional)",
+          "import_price_forecast": "Import Price Forecast (Optional)",
+          "export_price_forecast": "Export Price Forecast (Optional)",
+          "import_price": "Import Price Sensor",
+          "export_price": "Export Price Sensor"
         }
       },
       "configure_load": {
@@ -93,7 +95,7 @@
         "description": "Set up load forecasting and parameters",
         "data": {
           "name": "Load Name",
-          "forecast_sensors": "Forecast Sensors (Optional)",
+          "forecast": "Forecast Sensors (Optional)",
           "forecast_aggregation": "Forecast Aggregation Method",
           "forecast_multiplier": "Forecast Multiplier"
         }
@@ -103,7 +105,7 @@
         "description": "Set up generator forecasting and parameters",
         "data": {
           "name": "Generator Name",
-          "forecast_sensors": "Forecast Sensors (Optional)",
+          "forecast": "Forecast Sensors (Optional)",
           "forecast_aggregation": "Forecast Aggregation Method",
           "forecast_multiplier": "Forecast Multiplier"
         }

@@ -25,7 +25,7 @@ class BatteryConfig:
     name: str = name_field("Battery name")
 
     capacity: float = energy_field("Battery capacity in Wh")
-    current_charge_sensor: str = battery_soc_sensor_field("Sensor for current battery charge level in Wh/kWh or %")
+    current_charge: str = battery_soc_sensor_field("Sensor for current battery charge level")
 
     min_charge_percentage: float = battery_soc_field("Minimum charge percentage", default=10)
     max_charge_percentage: float = battery_soc_field("Maximum charge percentage", default=90)

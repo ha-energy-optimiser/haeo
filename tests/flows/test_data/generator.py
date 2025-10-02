@@ -2,9 +2,9 @@
 
 from custom_components.haeo.const import (
     CONF_NAME,
-    CONF_POWER_SENSOR,
+    CONF_POWER,
     CONF_CURTAILMENT,
-    CONF_FORECAST_SENSORS,
+    CONF_FORECAST,
     CONF_PRICE_PRODUCTION,
 )
 
@@ -14,18 +14,18 @@ VALID_DATA = [
         "description": "Basic generator configuration",
         "config": {
             CONF_NAME: "Test Generator",
-            CONF_POWER_SENSOR: "sensor.generator_power",
+            CONF_POWER: "sensor.generator_power",
             CONF_CURTAILMENT: False,
-            CONF_FORECAST_SENSORS: ["sensor.generator_forecast"],
+            CONF_FORECAST: ["sensor.generator_forecast"],
         },
     },
     {
         "description": "Curtailable generator configuration",
         "config": {
             CONF_NAME: "Curtailable Generator",
-            CONF_POWER_SENSOR: "sensor.generator_power",
+            CONF_POWER: "sensor.generator_power",
             CONF_CURTAILMENT: True,
-            CONF_FORECAST_SENSORS: ["sensor.generator_forecast"],
+            CONF_FORECAST: ["sensor.generator_forecast"],
             CONF_PRICE_PRODUCTION: 0.03,
         },
     },
@@ -33,9 +33,9 @@ VALID_DATA = [
         "description": "Generator with forecast sensors",
         "config": {
             CONF_NAME: "Solar Generator",
-            CONF_POWER_SENSOR: "sensor.generator_power",
+            CONF_POWER: "sensor.generator_power",
             CONF_CURTAILMENT: True,
-            CONF_FORECAST_SENSORS: ["sensor.solar_forecast"],
+            CONF_FORECAST: ["sensor.solar_forecast"],
             CONF_PRICE_PRODUCTION: 0.04,
         },
     },
@@ -44,12 +44,12 @@ VALID_DATA = [
 INVALID_DATA = [
     {
         "description": "Empty name should fail validation",
-        "config": {CONF_NAME: "", CONF_POWER_SENSOR: "sensor.test"},
+        "config": {CONF_NAME: "", CONF_POWER: "sensor.test"},
         "error": "cannot be empty",
     },
     {
         "description": "Invalid curtailment value should fail validation",
-        "config": {CONF_NAME: "Test", CONF_POWER_SENSOR: "sensor.test", CONF_CURTAILMENT: "invalid"},
+        "config": {CONF_NAME: "Test", CONF_POWER: "sensor.test", CONF_CURTAILMENT: "invalid"},
         "error": "expected bool",
     },
 ]

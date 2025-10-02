@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal, Sequence
 from dataclasses import dataclass
 
-from .fields import name_field, power_field, price_sensors_field, price_forecast_sensors_field
+from .fields import name_field, power_field, price_sensors_field, price_forecast_field
 
 
 @dataclass
@@ -16,11 +16,11 @@ class GridConfig:
 
     name: str = name_field("Grid connection name")
 
-    current_price_import: Sequence[str] = price_sensors_field("Sensor for current import price")
-    current_price_export: Sequence[str] = price_sensors_field("Sensor for current export price")
+    import_price: Sequence[str] = price_sensors_field("Sensor for current import price")
+    export_price: Sequence[str] = price_sensors_field("Sensor for current export price")
 
-    import_price_forecast: Sequence[str] = price_forecast_sensors_field("Sensor(s) for import price forecast")
-    export_price_forecast: Sequence[str] = price_forecast_sensors_field("Sensor(s) for export price forecast")
+    import_price_forecast: Sequence[str] = price_forecast_field("Sensor(s) for import price forecast")
+    export_price_forecast: Sequence[str] = price_forecast_field("Sensor(s) for export price forecast")
 
     import_limit: float | None = power_field("Maximum import power in W", optional=True)
     export_limit: float | None = power_field("Maximum export power in W", optional=True)

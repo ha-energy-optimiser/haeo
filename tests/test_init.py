@@ -8,14 +8,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.haeo import async_setup_entry, async_unload_entry, async_reload_entry
 from custom_components.haeo.const import (
     CONF_CAPACITY,
-    CONF_CURRENT_CHARGE_SENSOR,
+    CONF_CURRENT_CHARGE,
     CONF_ELEMENT_TYPE,
     CONF_EXPORT_LIMIT,
     CONF_IMPORT_LIMIT,
     CONF_MAX_POWER,
     CONF_PARTICIPANTS,
-    CONF_PRICE_EXPORT_SENSOR,
-    CONF_PRICE_IMPORT_SENSOR,
+    CONF_EXPORT_PRICE,
+    CONF_IMPORT_PRICE,
     CONF_SOURCE,
     CONF_TARGET,
     DOMAIN,
@@ -37,14 +37,14 @@ def mock_config_entry():
                 "test_battery": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY,
                     CONF_CAPACITY: 10000,
-                    CONF_CURRENT_CHARGE_SENSOR: "sensor.battery_charge",
+                    CONF_CURRENT_CHARGE: "sensor.battery_charge",
                 },
                 "test_grid": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
-                    CONF_PRICE_IMPORT_SENSOR: "sensor.import_price",
-                    CONF_PRICE_EXPORT_SENSOR: "sensor.export_price",
+                    CONF_IMPORT_PRICE: "sensor.import_price",
+                    CONF_EXPORT_PRICE: "sensor.export_price",
                 },
                 "test_connection": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION,

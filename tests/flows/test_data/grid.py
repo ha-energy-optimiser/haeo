@@ -4,8 +4,8 @@ from custom_components.haeo.const import (
     CONF_NAME,
     CONF_IMPORT_LIMIT,
     CONF_EXPORT_LIMIT,
-    CONF_PRICE_IMPORT_SENSOR,
-    CONF_PRICE_EXPORT_SENSOR,
+    CONF_IMPORT_PRICE,
+    CONF_EXPORT_PRICE,
 )
 
 # Test data for grid flow
@@ -24,8 +24,8 @@ VALID_DATA = [
             CONF_NAME: "Smart Grid",
             CONF_IMPORT_LIMIT: 8000,
             CONF_EXPORT_LIMIT: 5000,
-            CONF_PRICE_IMPORT_SENSOR: ["sensor.smart_grid_import_price"],
-            CONF_PRICE_EXPORT_SENSOR: ["sensor.smart_grid_export_price"],
+            CONF_IMPORT_PRICE: ["sensor.smart_grid_import_price"],
+            CONF_EXPORT_PRICE: ["sensor.smart_grid_export_price"],
         },
     },
 ]

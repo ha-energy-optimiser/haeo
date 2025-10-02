@@ -105,8 +105,8 @@ def test_battery_invalid_initial_charge():
 
 def test_grid_initialization():
     """Test grid initialization."""
-    price_import = [0.1, 0.2, 0.15]
-    price_export = [0.05, 0.08, 0.06]
+    import_price = [0.1, 0.2, 0.15]
+    export_price = [0.05, 0.08, 0.06]
 
     grid = Grid(
         name="test_grid",
@@ -114,8 +114,8 @@ def test_grid_initialization():
         n_periods=3,
         import_limit=10000,
         export_limit=5000,
-        price_import=price_import,
-        price_export=price_export,
+        import_price=import_price,
+        export_price=export_price,
     )
 
     assert grid.name == "test_grid"
@@ -123,35 +123,35 @@ def test_grid_initialization():
     assert grid.n_periods == 3
     assert len(grid.power_consumption) == 3
     assert len(grid.power_production) == 3
-    assert grid.price_consumption == price_export
-    assert grid.price_production == price_import
+    assert grid.price_consumption == export_price
+    assert grid.price_production == import_price
 
 
 def test_grid_invalid_forecast_length():
     """Test grid with invalid forecast length."""
-    with pytest.raises(ValueError, match="price_import length"):
+    with pytest.raises(ValueError, match="import_price length"):
         Grid(
             name="test_grid",
             period=3600,
             n_periods=3,
             import_limit=10000,
             export_limit=5000,
-            price_import=[0.1, 0.2],  # Wrong length
-            price_export=[0.05, 0.08, 0.06],
+            import_price=[0.1, 0.2],  # Wrong length
+            export_price=[0.05, 0.08, 0.06],
         )
 
 
 def test_grid_invalid_export_forecast_length():
     """Test grid with invalid export forecast length."""
-    with pytest.raises(ValueError, match="price_export length"):
+    with pytest.raises(ValueError, match="export_price length"):
         Grid(
             name="test_grid",
             period=3600,
             n_periods=3,
             import_limit=10000,
             export_limit=5000,
-            price_import=[0.1, 0.2, 0.15],
-            price_export=[0.05, 0.08],  # Wrong length
+            import_price=[0.1, 0.2, 0.15],
+            export_price=[0.05, 0.08],  # Wrong length
         )
 
 
@@ -163,8 +163,8 @@ def test_grid_initialization_defaults():
         n_periods=3,
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
 
     # Check that prices are correctly assigned (note: price_consumption is export price, price_production is import price)
@@ -181,8 +181,8 @@ def test_grid_negative_import_limit():
         n_periods=3,
         import_limit=-1000,  # Invalid negative limit - but no validation in constructor
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
     # Check that the grid was created successfully and has the expected structure
     assert grid.name == "test_grid"
@@ -198,8 +198,8 @@ def test_grid_negative_export_limit():
         n_periods=3,
         import_limit=10000,
         export_limit=-5000,  # Invalid negative limit - but no validation in constructor
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
     # Check that the grid was created successfully and has the expected structure
     assert grid.name == "test_grid"
@@ -214,13 +214,14 @@ def test_load_forecast_initialization():
         name="test_load",
         period=3600,
         n_periods=3,
+        current_power=500,
         forecast=forecast,
     )
 
     assert load.name == "test_load"
     assert load.period == 3600
     assert load.n_periods == 3
-    assert load.power_consumption == forecast
+    assert load.power_consumption == [500, 1000, 1500]  # current_power + forecast[:-1]
     assert load.power_production is None
 
 
@@ -231,6 +232,7 @@ def test_load_forecast_invalid_forecast_length():
             name="test_load",
             period=3600,
             n_periods=3,
+            current_power=500,
             forecast=[1000, 1500],  # Wrong length
         )
 
@@ -242,6 +244,7 @@ def test_load_forecast_empty_forecast():
             name="test_load",
             period=3600,
             n_periods=3,
+            current_power=500,
             forecast=[],  # Empty forecast
         )
 
@@ -308,7 +311,7 @@ def test_generator_initialization_without_curtailment():
     )
 
     assert generator.name == "test_generator"
-    assert generator.power_production is None
+    assert generator.power_production == forecast
 
 
 def test_generator_invalid_forecast_length():
@@ -421,8 +424,8 @@ def test_add_grid():
         "test_grid",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
 
     assert isinstance(grid, Grid)
@@ -441,6 +444,7 @@ def test_add_load():
     load = network.add(
         ELEMENT_TYPE_LOAD_FORECAST,
         "test_load",
+        current_power=500,
         forecast=[1000, 1500, 2000],
     )
 
@@ -519,8 +523,8 @@ def test_connect_entities():
         "grid1",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
 
     # Connect them
@@ -589,8 +593,8 @@ def test_connection_with_negative_power_bounds():
         "grid1",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
 
     # Create bidirectional connection
@@ -630,8 +634,8 @@ def test_connection_power_balance_with_negative_flow():
         "grid1",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
 
     # Create bidirectional connection
@@ -678,8 +682,8 @@ def test_connection_with_none_bounds():
         "grid1",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
 
     # Create connection with None bounds (unlimited power)
@@ -715,8 +719,8 @@ def test_connect_source_is_connection():
         "grid1",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
     network.add(ELEMENT_TYPE_CONNECTION, "conn1", source="battery1", target="grid1")
 
@@ -741,8 +745,8 @@ def test_connect_target_is_connection():
         "grid1",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
     network.add(ELEMENT_TYPE_CONNECTION, "conn1", source="battery1", target="grid1")
 
@@ -767,10 +771,10 @@ def test_simple_optimization():
         "grid",
         import_limit=10000,
         export_limit=5000,
-        price_import=[0.1, 0.2, 0.15],
-        price_export=[0.05, 0.08, 0.06],
+        import_price=[0.1, 0.2, 0.15],
+        export_price=[0.05, 0.08, 0.06],
     )
-    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", forecast=[1000, 1500, 2000])
+    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", current_power=500, forecast=[1000, 1500, 2000])
     network.add(ELEMENT_TYPE_NET, "net")
 
     # Connect them: grid -> net <- load
@@ -810,7 +814,7 @@ def test_battery_solar_grid_storage_cycle():
         ELEMENT_TYPE_GENERATOR, "solar", forecast=solar_forecast, curtailment=True, price_production=[0] * 8
     )  # Solar has no fuel cost
 
-    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", forecast=load_forecast)
+    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", current_power=500, forecast=load_forecast)
 
     network.add(
         ELEMENT_TYPE_BATTERY,
@@ -829,8 +833,8 @@ def test_battery_solar_grid_storage_cycle():
         "grid",
         import_limit=10000,
         export_limit=10000,
-        price_import=import_prices,
-        price_export=export_prices,
+        import_price=import_prices,
+        export_price=export_prices,
     )
 
     network.add(ELEMENT_TYPE_NET, "net")
@@ -905,15 +909,15 @@ def test_solar_curtailment_negative_pricing():
         price_production=[0] * 6,
     )  # No fuel cost for solar
 
-    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", forecast=load_forecast)
+    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", current_power=500, forecast=load_forecast)
 
     network.add(
         ELEMENT_TYPE_GRID,
         "grid",
         import_limit=10000,
         export_limit=10000,
-        price_import=import_prices,
-        price_export=export_prices,
+        import_price=import_prices,
+        export_price=export_prices,
     )
 
     network.add(ELEMENT_TYPE_NET, "net")
@@ -993,8 +997,8 @@ def test_solar_curtailment_negative_pricing():
                 "name": "test_grid",
                 "import_limit": 10000,
                 "export_limit": 5000,
-                "price_import": [0.1, 0.2, 0.15],
-                "price_export": [0.05, 0.08, 0.06],
+                "import_price": [0.1, 0.2, 0.15],
+                "export_price": [0.05, 0.08, 0.06],
                 "expected_power_vars": 3,
             },
             id="grid",
@@ -1012,6 +1016,7 @@ def test_solar_curtailment_negative_pricing():
             {
                 "type": ELEMENT_TYPE_LOAD_FORECAST,
                 "name": "test_load_forecast",
+                "current_power": 500,
                 "forecast": [1000, 1500, 2000],
                 "expected_power_vars": 3,
             },
@@ -1099,8 +1104,8 @@ def test_element_initialization(element_data):
                 "name": "test_grid",
                 "import_limit": 10000,
                 "export_limit": 5000,
-                "price_import": [0.1, 0.2, 0.15],
-                "price_export": [0.05, 0.08, 0.06],
+                "import_price": [0.1, 0.2, 0.15],
+                "export_price": [0.05, 0.08, 0.06],
             },
             id="grid",
         ),
@@ -1116,6 +1121,7 @@ def test_element_initialization(element_data):
             {
                 "type": ELEMENT_TYPE_LOAD_FORECAST,
                 "name": "test_load_forecast",
+                "current_power": 500,
                 "forecast": [1000, 1500, 2000],
             },
             id="load_forecast",

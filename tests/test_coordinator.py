@@ -43,15 +43,15 @@ def mock_config_entry():
                 "test_battery": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY,
                     CONF_CAPACITY: 10000,
-                    "current_charge_sensor": "sensor.battery_charge",
+                    "current_charge": "sensor.battery_charge",
                 },
                 "test_grid": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID,
                     CONF_IMPORT_LIMIT: 10000,
                     CONF_EXPORT_LIMIT: 5000,
                     # For tests, use constant pricing to avoid sensor setup complexity
-                    "price_import": [0.1] * 576,  # 48 hours in 5-minute steps
-                    "price_export": [0.05] * 576,  # 48 hours in 5-minute steps
+                    "import_price": [0.1] * 576,  # 48 hours in 5-minute steps
+                    "export_price": [0.05] * 576,  # 48 hours in 5-minute steps
                 },
                 "test_connection": {
                     CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION,

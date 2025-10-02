@@ -64,7 +64,7 @@ def power_sensors_field(description: str, optional: bool = False) -> Sequence[st
     )
 
 
-def power_forecast_sensors_field(description: str, optional: bool = False) -> Sequence[str]:
+def power_forecast_field(description: str, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of power forecast sensors."""
     return field(
         default_factory=list,
@@ -134,7 +134,7 @@ def energy_sensors_field(description: str, optional: bool = False) -> Sequence[s
     )
 
 
-def energy_forecast_sensors_field(description: str, optional: bool = False) -> Sequence[str]:
+def energy_forecast_field(description: str, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of energy forecast sensors stored as attributes."""
     return field(
         default_factory=list,
@@ -182,7 +182,7 @@ def price_sensors_field(description: str, optional: bool = False) -> Sequence[st
     )
 
 
-def price_forecast_sensors_field(description: str, optional: bool = False) -> Sequence[str]:
+def price_forecast_field(description: str, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of price forecast sensors."""
     return field(
         default_factory=list,

@@ -33,7 +33,7 @@ ELEMENT_TYPES = [
 
 # Battery configuration keys
 CONF_CAPACITY = "capacity"
-CONF_CURRENT_CHARGE_SENSOR = "current_charge_sensor"
+CONF_CURRENT_CHARGE = "current_charge"
 CONF_MIN_CHARGE_PERCENTAGE = "min_charge_percentage"
 CONF_MAX_CHARGE_PERCENTAGE = "max_charge_percentage"
 CONF_MAX_CHARGE_POWER = "max_charge_power"
@@ -45,17 +45,16 @@ CONF_DISCHARGE_COST = "discharge_cost"
 # Grid configuration keys
 CONF_IMPORT_LIMIT = "import_limit"
 CONF_EXPORT_LIMIT = "export_limit"
-CONF_PRICE_IMPORT_SENSOR = "price_import_sensor"
-CONF_PRICE_EXPORT_SENSOR = "price_export_sensor"
-CONF_PRICE_IMPORT_FORECAST_SENSORS = "price_import_forecast_sensor"
-CONF_PRICE_EXPORT_FORECAST_SENSORS = "price_export_forecast_sensor"
+CONF_IMPORT_PRICE = "import_price"
+CONF_EXPORT_PRICE = "export_price"
+CONF_IMPORT_PRICE_FORECAST = "import_price_forecast"
+CONF_EXPORT_PRICE_FORECAST = "export_price_forecast"
 
 # Load configuration keys
 CONF_LOAD_TYPE = "load_type"
 CONF_POWER = "power"
 CONF_ENERGY = "energy"
 CONF_FORECAST = "forecast"
-CONF_FORECAST_SENSORS = "forecast_sensors"
 
 # Load types
 LOAD_TYPE_FIXED = "fixed"
@@ -66,7 +65,7 @@ LOAD_TYPE_FORECAST = "forecast"
 CONF_CURTAILMENT = "curtailment"
 CONF_PRICE_PRODUCTION = "price_production"
 CONF_PRICE_CONSUMPTION = "price_consumption"
-CONF_POWER_SENSOR = "power_sensor"
+CONF_POWER = "power"
 
 # Sensor configuration keys
 CONF_SENSORS = "sensors"
