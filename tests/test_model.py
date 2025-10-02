@@ -8,7 +8,7 @@ from custom_components.haeo.const import (
     ELEMENT_TYPE_GRID,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_LOAD_FORECAST,
-    ELEMENT_TYPE_LOAD_FIXED,
+    ELEMENT_TYPE_LOAD_CONSTANT,
     ELEMENT_TYPE_NET,
 )
 from custom_components.haeo.model import Network
@@ -497,7 +497,7 @@ def test_network_add_duplicate_element():
     assert battery1 is not None
 
     # Try to add another element with same name - this should overwrite or handle gracefully
-    battery2 = network.add(ELEMENT_TYPE_BATTERY, "test_battery", capacity=15000, initial_charge_percentage=75)
+    network.add(ELEMENT_TYPE_BATTERY, "test_battery", capacity=15000, initial_charge_percentage=75)
 
     # Network may allow overwriting or handle duplicates differently
     # Check that we have an element with the expected name
@@ -1001,7 +1001,7 @@ def test_solar_curtailment_negative_pricing():
         ),
         pytest.param(
             {
-                "type": ELEMENT_TYPE_LOAD_FIXED,
+                "type": ELEMENT_TYPE_LOAD_CONSTANT,
                 "name": "test_load_constant",
                 "power": 1500,
                 "expected_power_vars": 3,
@@ -1052,7 +1052,7 @@ def test_element_initialization(element_data):
         element = Battery(name=name, period=3600, n_periods=24, **kwargs)
     elif element_type == ELEMENT_TYPE_GRID:
         element = Grid(name=name, period=3600, n_periods=3, **kwargs)
-    elif element_type == ELEMENT_TYPE_LOAD_FIXED:
+    elif element_type == ELEMENT_TYPE_LOAD_CONSTANT:
         element = LoadConstant(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_LOAD_FORECAST:
         element = LoadForecast(name=name, period=3600, n_periods=3, **kwargs)
@@ -1106,7 +1106,7 @@ def test_element_initialization(element_data):
         ),
         pytest.param(
             {
-                "type": ELEMENT_TYPE_LOAD_FIXED,
+                "type": ELEMENT_TYPE_LOAD_CONSTANT,
                 "name": "test_load_constant",
                 "power": 1500,
             },
@@ -1153,7 +1153,7 @@ def test_element_constraints(element_data):
         element = Battery(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_GRID:
         element = Grid(name=name, period=3600, n_periods=3, **kwargs)
-    elif element_type == ELEMENT_TYPE_LOAD_FIXED:
+    elif element_type == ELEMENT_TYPE_LOAD_CONSTANT:
         element = LoadConstant(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_LOAD_FORECAST:
         element = LoadForecast(name=name, period=3600, n_periods=3, **kwargs)

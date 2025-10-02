@@ -3,7 +3,7 @@
     "device": {
       "battery": "Battery",
       "grid_connection": "Grid Connection",
-      "fixed_load": "Fixed Load",
+      "constant_load": "Constant Load",
       "forecast_load": "Forecast Load",
       "generator": "Generator",
       "network_node": "Network Node",

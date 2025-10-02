@@ -16,7 +16,7 @@ CONF_PARTICIPANTS = "participants"
 ELEMENT_TYPE_BATTERY = "battery"
 ELEMENT_TYPE_CONNECTION = "connection"
 ELEMENT_TYPE_GRID = "grid"
-ELEMENT_TYPE_LOAD_FIXED = "load_fixed"
+ELEMENT_TYPE_LOAD_CONSTANT = "load_constant"
 ELEMENT_TYPE_LOAD_FORECAST = "load_forecast"
 ELEMENT_TYPE_GENERATOR = "generator"
 ELEMENT_TYPE_NET = "net"
@@ -25,7 +25,7 @@ ELEMENT_TYPES = [
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_CONNECTION,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_FIXED,
+    ELEMENT_TYPE_LOAD_CONSTANT,
     ELEMENT_TYPE_LOAD_FORECAST,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_NET,
@@ -105,7 +105,7 @@ def get_element_type_name(element_type: str) -> str:
     device_type_map = {
         ELEMENT_TYPE_BATTERY: "entity.device.battery",
         ELEMENT_TYPE_GRID: "entity.device.grid_connection",
-        ELEMENT_TYPE_LOAD_FIXED: "entity.device.fixed_load",
+        ELEMENT_TYPE_LOAD_CONSTANT: "entity.device.constant_load",
         ELEMENT_TYPE_LOAD_FORECAST: "entity.device.forecast_load",
         ELEMENT_TYPE_GENERATOR: "entity.device.generator",
         ELEMENT_TYPE_NET: "entity.device.network_node",

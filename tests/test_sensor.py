@@ -14,7 +14,7 @@ from custom_components.haeo.const import (
     ELEMENT_TYPE_CONNECTION,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_FIXED,
+    ELEMENT_TYPE_LOAD_CONSTANT,
     ELEMENT_TYPE_LOAD_FORECAST,
     ELEMENT_TYPE_NET,
     OPTIMIZATION_STATUS_SUCCESS,
@@ -71,7 +71,7 @@ def mock_config_entry():
             "participants": {
                 "test_battery": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY},
                 "test_grid": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID},
-                "test_load_fixed": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_LOAD_FIXED},
+                "test_load_fixed": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_LOAD_CONSTANT},
                 "test_load_forecast": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_LOAD_FORECAST},
                 "test_connection": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION},
             },
@@ -536,10 +536,10 @@ def test_load_sensor_device_info(mock_coordinator, mock_config_entry):
 
 def test_load_fixed_sensor_device_info(mock_coordinator, mock_config_entry):
     """Test device info for fixed load sensor."""
-    sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load_fixed", ELEMENT_TYPE_LOAD_FIXED)
+    sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load_fixed", ELEMENT_TYPE_LOAD_CONSTANT)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Fixed Load"
+    assert device_info.get("model") == "Energy Optimization Constant Load"
 
 
 def test_load_forecast_sensor_device_info(mock_coordinator, mock_config_entry):

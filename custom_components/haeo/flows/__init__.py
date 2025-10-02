@@ -3,115 +3,81 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import fields
+from typing import Any, get_type_hints
 
-from homeassistant.components.sensor.const import SensorDeviceClass
-from homeassistant.helpers.selector import (
-    EntitySelector,
-    EntitySelectorConfig,
-    NumberSelector,
-    NumberSelectorConfig,
-    NumberSelectorMode,
-)
+from ..types import ELEMENT_TYPES
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
 import voluptuous as vol
 
-from ..const import (
-    ELEMENT_TYPE_BATTERY,
-    ELEMENT_TYPE_CONNECTION,
-    ELEMENT_TYPE_GENERATOR,
-    ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_FIXED,
-    ELEMENT_TYPE_LOAD_FORECAST,
-    ELEMENT_TYPE_NET,
-)
+from ..const import CONF_SOURCE, CONF_TARGET
+
 
 _LOGGER = logging.getLogger(__name__)
 
-# Optimized validators using voluptuous built-ins
-validate_element_name = vol.All(str, vol.Strip, vol.Length(min=1, msg="Name cannot be empty"))
 
-validate_positive_number = vol.All(
-    vol.Coerce(float), vol.Range(min=0, min_included=False, msg="Value must be positive")
-)
-validate_percentage = vol.All(
-    vol.Coerce(float),
-    vol.Range(min=0, max=100, msg="Value must be between 0 and 100"),
-    NumberSelector(
-        NumberSelectorConfig(
-            mode=NumberSelectorMode.BOX,
-            min=0,
-            max=100,
-            step=1,
-            unit_of_measurement="%",
-        )
-    ),
-)
-
-validate_efficiency = vol.All(
-    NumberSelector(
-        NumberSelectorConfig(
-            mode=NumberSelectorMode.BOX,
-            min=0.01,
-            max=1.0,
-            step=0.01,
-        )
-    ),
-    vol.Coerce(float),
-    vol.Range(min=0, max=1, min_included=False, msg="Efficiency must be between 0 and 1"),
-)
-
-validate_price_value = vol.All(
-    vol.Coerce(float),
-    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="$/kWh")),
-)
-validate_price_sensors = EntitySelector(
-    EntitySelectorConfig(
-        domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]
-    )
-)
-
-validate_power_value = vol.All(
-    validate_positive_number,
-    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="W")),
-)
-validate_power_flow_value = vol.All(
-    vol.Coerce(float),
-    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="W")),
-)
-validate_power_sensor = EntitySelector(EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.POWER]))
-validate_power_forecast_sensors = EntitySelector(
-    EntitySelectorConfig(
-        domain="sensor", multiple=True, device_class=[SensorDeviceClass.POWER, SensorDeviceClass.ENERGY]
-    )
-)
-
-validate_energy_value = vol.All(
-    validate_positive_number,
-    NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="Wh")),
-)
-validate_energy_sensor = EntitySelector(
-    EntitySelectorConfig(domain="sensor", device_class=[SensorDeviceClass.BATTERY, SensorDeviceClass.ENERGY_STORAGE])
-)
+def _get_participant_options(participants: dict[str, Any]) -> list[str]:
+    """Get list of participant names for dropdown selection."""
+    return list(participants.keys())
 
 
-def _get_schemas():
-    """Get schema functions for all element types."""
-    from . import battery, connection, generator, grid, load_constant, load_forecast, net
+def _create_schema_from_config_class(config_class: type, participants: dict[str, Any] | None = None) -> vol.Schema:
+    """Create a voluptuous schema from a config dataclass."""
+    schema_dict = {}
 
-    return {
-        ELEMENT_TYPE_BATTERY: battery.get_battery_schema,
-        ELEMENT_TYPE_CONNECTION: connection.get_connection_schema,
-        ELEMENT_TYPE_GENERATOR: generator.get_generator_schema,
-        ELEMENT_TYPE_GRID: grid.get_grid_schema,
-        ELEMENT_TYPE_LOAD_FIXED: load_constant.get_constant_load_schema,
-        ELEMENT_TYPE_LOAD_FORECAST: load_forecast.get_forecast_load_schema,
-        ELEMENT_TYPE_NET: net.get_net_schema,
-    }
+    # Get type hints for the class
+    type_hints = get_type_hints(config_class)
+
+    for field_info in fields(config_class):
+        field_name = field_info.name
+        type_hints.get(field_name)
+        field_metadata = field_info.metadata
+
+        # Skip the element_type field as it's handled separately
+        if field_name == "element_type":
+            continue
+
+        # Get the schema from metadata
+        schema = field_metadata.get("schema")
+        optional = field_metadata.get("optional", False)
+
+        # Handle special cases for connections
+        if config_class.__name__ == "ConnectionConfig" and field_name in [CONF_SOURCE, CONF_TARGET]:
+            if participants is not None:
+                participant_options = _get_participant_options(participants)
+                schema = SelectSelector(
+                    SelectSelectorConfig(
+                        options=participant_options,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            else:
+                # Fallback if no participants provided
+                schema = vol.All(str, vol.Strip, vol.Length(min=1, msg=f"{field_name} cannot be empty"))
+
+        # Handle fields with None schema (like element_name_field)
+        if schema is None:
+            schema = vol.All(str, vol.Strip, vol.Length(min=1, msg=f"{field_name} cannot be empty"))
+
+        # Check if field has a default value (not default_factory)
+        has_default = field_info.default is not None and field_info.default != vol.UNDEFINED
+
+        # Handle optional fields or fields with defaults or default_factory
+        if optional or has_default or field_info.default_factory is not None:
+            # Use UNDEFINED for truly optional fields (not included in output if not provided)
+            schema_dict[vol.Optional(field_name)] = schema
+        else:
+            schema_dict[vol.Required(field_name)] = schema
+
+    return vol.Schema(schema_dict)
 
 
-# Schema function mapping for dynamic schema selection
-SCHEMA_FUNCTIONS = _get_schemas()
+def get_schema(element_type: str, **kwargs) -> vol.Schema:
+    """Get the appropriate schema for the given element type."""
 
+    config_class = ELEMENT_TYPES.get(element_type)
+    if config_class is None:
+        raise ValueError(f"Unknown element type: {element_type}")
 
-def get_schema(element_type: str, **kwargs):
-    """Get the appropriate schema function for the given element type."""
-    return SCHEMA_FUNCTIONS[element_type](**kwargs)
+    participants = kwargs.get("participants")
+    return _create_schema_from_config_class(config_class, participants)

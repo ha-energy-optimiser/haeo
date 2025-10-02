@@ -36,7 +36,7 @@ class Network:
         self.elements[name] = {
             "battery": Battery,
             "generator": Generator,
-            "load_fixed": LoadConstant,
+            "load_constant": LoadConstant,
             "load_forecast": LoadForecast,
             "grid": Grid,
             "net": Net,

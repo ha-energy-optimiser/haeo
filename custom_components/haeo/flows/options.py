@@ -15,7 +15,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
-from ..const import ELEMENT_TYPES, get_element_type_name, CONF_ELEMENT_TYPE
+from ..const import get_element_type_name, CONF_ELEMENT_TYPE
+from ..types import ELEMENT_TYPES
 from . import get_schema
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class HubOptionsFlow(config_entries.OptionsFlow):
         # Show participant type selection
         participant_types = [
             SelectOptionDict(value=element_type, label=get_element_type_name(element_type))
-            for element_type in ELEMENT_TYPES
+            for element_type in ELEMENT_TYPES.keys()
         ]
 
         return self.async_show_form(
