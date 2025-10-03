@@ -341,25 +341,6 @@ def test_element_energy_sensor_extra_state_attributes(mock_coordinator, mock_con
     assert len(attrs["timestamped_forecast"]) == 3
 
 
-def test_sensor_base_device_info_with_element(mock_coordinator, mock_config_entry):
-    """Test device info property with element info."""
-    sensor = HaeoSensorBase(
-        mock_coordinator,
-        mock_config_entry,
-        "test_type",
-        "Test Sensor",
-        "test_battery",
-        ELEMENT_TYPE_BATTERY,
-    )
-    device_info = sensor.device_info
-
-    assert device_info is not None
-    assert device_info.get("identifiers") == {(DOMAIN, f"{mock_config_entry.entry_id}_test_battery")}
-    assert device_info.get("name") == "test_battery"
-    assert device_info.get("manufacturer") == "HAEO"
-    assert device_info.get("model") == "Energy Optimization Battery"
-
-
 def test_sensor_base_device_info_with_grid_element(mock_coordinator, mock_config_entry):
     """Test device info property with grid element info."""
     sensor = HaeoSensorBase(

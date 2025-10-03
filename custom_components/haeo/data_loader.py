@@ -4,15 +4,29 @@ from __future__ import annotations
 
 from dataclasses import fields
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor.const import DEVICE_CLASS_UNITS, UNIT_CONVERTERS, SensorDeviceClass
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+import numpy as np
 
 from .const import CONF_ELEMENT_TYPE, FIELD_TYPE_CONSTANT, FIELD_TYPE_FORECAST, FIELD_TYPE_SENSOR
 from .model import Network
 from .types import ELEMENT_TYPES
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    # Union type for field values that can be either configuration objects or actual values
+    FieldValue = (
+        str  # sensor entity IDs
+        | list[str]  # list of sensor entity IDs
+        | float  # constant numeric values
+        | list[float]  # list of constant numeric values
+        | bool  # constant boolean values
+        | list[bool]  # list of constant boolean values
+        | None  # None values
+    )
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,13 +73,15 @@ def get_field_type(field_name: str, config_class: type) -> tuple[SensorDeviceCla
             # field_type must be specified in metadata
             field_type = field_info.metadata.get("field_type")
             if field_type is None:
+                msg = f"Field '{field_name}' in {config_class.__name__} must have 'field_type' specified in metadata"
                 raise ValueError(
-                    f"Field '{field_name}' in {config_class.__name__} must have 'field_type' specified in metadata",
+                    msg,
                 )
 
             return field_type
 
-    raise ValueError(f"Field '{field_name}' not found in {config_class.__name__}")
+    msg = f"Field '{field_name}' not found in {config_class.__name__}"
+    raise ValueError(msg)
 
 
 def get_field_device_class(field_name: str, config_class: type) -> SensorDeviceClass | str:
@@ -117,7 +133,8 @@ def is_constant_field(field_name: str, config_class: type) -> bool:
 class DataLoader:
     """Generic data loading system for HAEO that handles all schema types."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize the data loader."""
         self.hass = hass
 
     async def load_network_data(self, config_entry: ConfigEntry, period_seconds: int, n_periods: int) -> Network:
@@ -125,6 +142,8 @@ class DataLoader:
 
         Args:
             config_entry: The configuration entry containing participants and settings
+            period_seconds: Time period in seconds for optimization
+            n_periods: Number of time periods for the optimization horizon
 
         Returns:
             A fully populated Network object with all elements and their data loaded
@@ -152,7 +171,7 @@ class DataLoader:
             await self._load_element_data(network, element_name, element_config, n_periods)
 
         # Store sensor availability status in the network for the coordinator to use
-        network._sensor_data_available = sensor_data_available
+        network.sensor_data_available = sensor_data_available
 
         return network
 
@@ -166,11 +185,6 @@ class DataLoader:
             True if all required sensor data is available, False otherwise
 
         """
-        from dataclasses import fields
-
-        from .const import CONF_ELEMENT_TYPE
-        from .types import ELEMENT_TYPES
-
         config = config_entry.data
         participants = config.get("participants", {})
 
@@ -273,17 +287,17 @@ class DataLoader:
 
         try:
             network.add(element_type, element_name, **element_params)
-        except Exception as ex:
-            _LOGGER.error("Failed to add element %s: %s", element_name, ex)
+        except Exception:
+            _LOGGER.exception("Failed to add element %s", element_name)
             raise
 
     async def load_field_data(
         self,
         field_name: str,
-        field_value: Any,
+        field_value: FieldValue,
         config_class: type,
         n_periods: int | None = None,
-    ) -> Any:
+    ) -> FieldValue | None:
         """Load field data based on its type and return populated data.
 
         Args:
@@ -307,37 +321,55 @@ class DataLoader:
             # If field_type is not properly defined, return as-is
             return field_value
 
-        # Handle constant fields
+        # Handle different field types
         if property_type == FIELD_TYPE_CONSTANT:
             return field_value
 
-        # Handle sensor and forecast fields
         if property_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]:
-            if isinstance(field_value, list):
-                # Check if it's a list of sensor IDs (strings) or constant values (numbers)
-                if field_value and isinstance(field_value[0], str):
-                    sensor_ids = field_value
-                else:
-                    # It's a list of constant values, return as-is
-                    return field_value
-            elif isinstance(field_value, str):
-                sensor_ids = [field_value]
-            else:
-                # Single constant value
-                return field_value
-
-            if property_type == FIELD_TYPE_FORECAST:
-                # Load forecast data directly
-                return await self.load_sensor_forecast(sensor_ids, device_class, n_periods)
-            # For single-value sensor fields, sum all sensor values
-            total_value = None
-            for sensor_id in sensor_ids:
-                sensor_value = await self.load_sensor_value(sensor_id, device_class)
-                if sensor_value is not None:
-                    total_value = total_value + sensor_value if total_value is not None else sensor_value
-            return total_value
+            return await self._load_sensor_field_data(field_value, property_type, device_class, n_periods)
 
         return field_value
+
+    async def _load_sensor_field_data(
+        self,
+        field_value: FieldValue,
+        property_type: str,
+        device_class: SensorDeviceClass | str,
+        n_periods: int,
+    ) -> FieldValue | None:
+        """Load sensor or forecast field data."""
+        sensor_ids = self._extract_sensor_ids(field_value)
+        if not sensor_ids:
+            return field_value
+
+        if property_type == FIELD_TYPE_FORECAST:
+            return await self.load_sensor_forecast(sensor_ids, n_periods)
+
+        # For single-value sensor fields, sum all sensor values
+        return await self._sum_sensor_values(sensor_ids, device_class)
+
+    def _extract_sensor_ids(self, field_value: FieldValue) -> list[str] | None:
+        """Extract sensor IDs from field value."""
+        if isinstance(field_value, list):
+            # Check if it's a list of sensor IDs (strings) or constant values (numbers)
+            if field_value and isinstance(field_value[0], str):
+                return field_value
+            # It's a list of constant values, return None to indicate no sensors
+            return None
+        if isinstance(field_value, str):
+            return [field_value]
+
+        # Single constant value or other type
+        return None
+
+    async def _sum_sensor_values(self, sensor_ids: list[str], device_class: SensorDeviceClass | str) -> float | None:
+        """Sum values from multiple sensors."""
+        total_value = None
+        for sensor_id in sensor_ids:
+            sensor_value = await self.load_sensor_value(sensor_id)
+            if sensor_value is not None:
+                total_value = total_value + sensor_value if total_value is not None else sensor_value
+        return total_value
 
     async def _load_current_sensor_values(
         self,
@@ -349,7 +381,7 @@ class DataLoader:
         total_value = None
 
         for sensor_id in sensor_ids:
-            sensor_value = await self.load_sensor_value(sensor_id, device_class)
+            sensor_value = await self.load_sensor_value(sensor_id)
             if sensor_value is not None:
                 total_value = total_value + sensor_value if total_value is not None else sensor_value
 
@@ -363,7 +395,6 @@ class DataLoader:
     async def load_sensor_value(
         self,
         sensor_id: str,
-        field_type: str | SensorDeviceClass | None = None,
     ) -> float | None:
         """Load current value from a sensor and convert to base units."""
         state = self.hass.states.get(sensor_id)
@@ -385,14 +416,13 @@ class DataLoader:
                 unit = state.attributes.get("unit_of_measurement")
                 value = convert_to_base_unit(value, unit, device_class)
             return value
-        except (ValueError, TypeError) as ex:
-            _LOGGER.error("Invalid numeric value in sensor %s: %s", sensor_id, ex)
+        except (ValueError, TypeError):
+            _LOGGER.exception("Invalid numeric value in sensor %s", sensor_id)
             return None
 
     async def load_sensor_forecast(
         self,
         sensor_ids: str | list[str],
-        device_class: SensorDeviceClass | str,
         n_periods: int,
     ) -> list[float] | None:
         """Load forecast data from sensor(s) and combine them."""
@@ -439,8 +469,8 @@ class DataLoader:
                     if len(sensor_forecast) != n_periods:
                         sensor_forecast = self._resample_forecast(sensor_forecast, n_periods)
                     _LOGGER.debug("Loaded forecast for %s: %d values", sensor_id, len(sensor_forecast))
-                except (ValueError, TypeError) as ex:
-                    _LOGGER.error("Invalid forecast data in sensor %s: %s", sensor_id, ex)
+                except (ValueError, TypeError):
+                    _LOGGER.exception("Invalid forecast data in sensor %s", sensor_id)
                     # Fall back to current state value when forecast is invalid
                     sensor_forecast = self._get_repeated_value(state, sensor_id, n_periods)
             else:
@@ -458,8 +488,6 @@ class DataLoader:
 
     def _resample_forecast(self, forecast: list[float], target_periods: int) -> list[float]:
         """Resample forecast to target number of periods using numpy interpolation."""
-        import numpy as np
-
         if len(forecast) == target_periods:
             return forecast
         if len(forecast) == 0:
@@ -475,7 +503,7 @@ class DataLoader:
         resampled_values = np.interp(target_indices, source_indices, forecast)
         return resampled_values.tolist()
 
-    def _get_repeated_value(self, state, sensor_id: str, n_periods: int) -> list[float] | None:
+    def _get_repeated_value(self, state: Any, sensor_id: str, n_periods: int) -> list[float] | None:
         """Get repeated current state value for forecast periods."""
         try:
             current_value = float(state.state)
@@ -491,6 +519,6 @@ class DataLoader:
                 unit = state.attributes.get("unit_of_measurement")
                 current_value = convert_to_base_unit(current_value, unit, device_class)
             return [current_value] * n_periods
-        except (ValueError, TypeError) as ex:
-            _LOGGER.error("Invalid state value in sensor %s: %s", sensor_id, ex)
+        except (ValueError, TypeError):
+            _LOGGER.exception("Invalid state value in sensor %s", sensor_id)
             return None

@@ -1,3 +1,5 @@
+"""Connection class for electrical system modeling."""
+
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -11,13 +13,24 @@ class Connection:
     def __init__(
         self,
         name: str,
-        period: int,
         n_periods: int,
+        *,
         source: str,
         target: str,
         min_power: float | None = None,
         max_power: float | None = None,
-    ):
+    ) -> None:
+        """Initialize a connection between two elements.
+
+        Args:
+            name: Name of the connection
+            n_periods: Number of time periods
+            source: Name of the source element
+            target: Name of the target element
+            min_power: Minimum power flow (negative for bidirectional)
+            max_power: Maximum power flow
+
+        """
         self.name = name
         self.source = source
         self.target = target

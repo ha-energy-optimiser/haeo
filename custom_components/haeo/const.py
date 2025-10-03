@@ -2,7 +2,7 @@
 
 import json
 import logging
-import os
+from pathlib import Path
 
 # Integration domain
 DOMAIN = "haeo"
@@ -82,6 +82,11 @@ CONF_PERIOD_MINUTES = "period_minutes"
 DEFAULT_HORIZON_HOURS = 48  # 48 hours default
 DEFAULT_PERIOD_MINUTES = 5  # 5 minutes default
 
+# Validation constants
+MAX_HORIZON_HOURS = 168  # 1 week maximum
+MAX_PERIOD_MINUTES = 60  # 1 hour maximum
+MAX_NAME_LENGTH = 255
+
 
 # Update intervals
 DEFAULT_UPDATE_INTERVAL = 300  # 5 minutes in seconds
@@ -122,31 +127,33 @@ def get_element_type_name(element_type: str) -> str:
 
     try:
         # Load translations from en.json file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        translations_file = os.path.join(current_dir, "translations", "en.json")
+        translations_file = Path(__file__).parent / "translations" / "en.json"
 
-        with open(translations_file, encoding="utf-8") as f:
+        with translations_file.open(encoding="utf-8") as f:
             translations_data = json.load(f)
 
         translation_key = device_type_map.get(element_type)
 
         if not translation_key:
-            raise ValueError(f"Unknown element type: {element_type}")
+            msg = f"Unknown element type: {element_type}"
+            raise ValueError(msg)
 
         # Parse the translation key path (e.g., "entity.device.battery")
         key_parts = translation_key.split(".")
         value = translations_data
         for part in key_parts:
             if part not in value:
-                raise KeyError(f"Translation key not found: {translation_key}")
+                msg = f"Translation key not found: {translation_key}"
+                raise KeyError(msg)
             value = value[part]
 
         if not isinstance(value, str):
-            raise TypeError(f"Translation value is not a string for key: {translation_key}")
+            msg = f"Translation value is not a string for key: {translation_key}"
+            raise TypeError(msg)
 
         return value
 
-    except (json.JSONDecodeError, FileNotFoundError, KeyError, TypeError, ValueError) as ex:
-        _logger.error("Failed to get element type name for %s: %s", element_type, ex)
+    except (json.JSONDecodeError, FileNotFoundError, KeyError, TypeError, ValueError):
+        _logger.exception("Failed to get element type name for %s", element_type)
         # Use a generic fallback for error cases
         return "Device"

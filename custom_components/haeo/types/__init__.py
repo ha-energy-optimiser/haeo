@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Union
-
 from .battery import BatteryConfig
 from .connection import ConnectionConfig
 from .constant_load import ConstantLoadConfig
@@ -24,12 +22,12 @@ ELEMENT_TYPES = {
 }
 
 # Type-safe discriminated union for element configurations
-ElementConfig = Union[
-    BatteryConfig,
-    GridConfig,
-    ConstantLoadConfig,
-    ForecastLoadConfig,
-    GeneratorConfig,
-    NetConfig,
-    ConnectionConfig,
-]
+ElementConfig = (
+    BatteryConfig
+    | GridConfig
+    | ConstantLoadConfig
+    | ForecastLoadConfig
+    | GeneratorConfig
+    | NetConfig
+    | ConnectionConfig
+)

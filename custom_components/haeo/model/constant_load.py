@@ -1,10 +1,12 @@
+"""Constant load entity for electrical system modeling."""
+
 from .element import Element
 
 
 class ConstantLoad(Element):
     """Constant load entity for electrical system modeling."""
 
-    def __init__(self, name: str, period: int, n_periods: int, power: float):
+    def __init__(self, name: str, period: int, n_periods: int, *, power: float) -> None:
         """Initialize a constant load.
 
         Args:

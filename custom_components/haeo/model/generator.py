@@ -1,3 +1,5 @@
+"""Generator entity for electrical system modeling."""
+
 from collections.abc import Sequence
 
 import numpy as np
@@ -14,14 +16,28 @@ class Generator(Element):
         name: str,
         period: int,
         n_periods: int,
+        *,
         forecast: Sequence[float],
         curtailment: bool = True,
         price_production: float | Sequence[float] | None = None,
         price_consumption: float | Sequence[float] | None = None,
-    ):
+    ) -> None:
+        """Initialize a generator entity.
+
+        Args:
+            name: Name of the generator
+            period: Time period in seconds
+            n_periods: Number of time periods
+            forecast: Forecasted power generation in watts
+            price_production: Price per watt for production
+            price_consumption: Price per watt for consumption (if applicable)
+            curtailment: Whether generation can be curtailed below forecast
+
+        """
         # Validate forecast length matches n_periods if provided
         if len(forecast) != n_periods:
-            raise ValueError(f"forecast length ({len(forecast)}) must match n_periods ({n_periods})")
+            msg = f"forecast length ({len(forecast)}) must match n_periods ({n_periods})"
+            raise ValueError(msg)
 
         ones = np.ones(n_periods)
 

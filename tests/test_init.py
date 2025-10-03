@@ -1,5 +1,6 @@
 """Test the HAEO integration."""
 
+from contextlib import suppress
 from unittest.mock import AsyncMock
 
 from homeassistant.core import HomeAssistant
@@ -27,7 +28,7 @@ from custom_components.haeo.const import (
 
 
 @pytest.fixture
-def mock_config_entry():
+def mock_config_entry() -> MockConfigEntry:
     """Create a mock config entry."""
     return MockConfigEntry(
         domain=DOMAIN,
@@ -60,7 +61,7 @@ def mock_config_entry():
     )
 
 
-async def test_setup_entry(hass: HomeAssistant, mock_config_entry):
+async def test_setup_entry(hass: HomeAssistant, mock_config_entry: MockConfigEntry) -> None:
     """Test setting up the integration."""
     mock_config_entry.add_to_hass(hass)
 
@@ -71,18 +72,16 @@ async def test_setup_entry(hass: HomeAssistant, mock_config_entry):
     # The real integration works correctly as verified by successful optimization runs
 
     # For this test, we'll verify that the setup function exists and basic structure works
-    try:
+
+    with suppress(Exception):
         await async_setup_entry(hass, mock_config_entry)
-    except Exception as ex:
-        # If there's an exception, that's expected due to platform setup complexity in tests
-        print(f"Setup failed as expected in test environment: {ex}")
 
     # The test passes if the setup works or fails gracefully
     # (the real integration works correctly as shown by successful optimization)
     assert True  # Test passes - real functionality is verified by other tests
 
 
-async def test_unload_entry(hass: HomeAssistant, mock_config_entry):
+async def test_unload_entry(hass: HomeAssistant, mock_config_entry: MockConfigEntry) -> None:
     """Test unloading the integration."""
     mock_config_entry.add_to_hass(hass)
 
@@ -97,7 +96,7 @@ async def test_unload_entry(hass: HomeAssistant, mock_config_entry):
     assert mock_config_entry.runtime_data is None
 
 
-async def test_reload_entry(hass: HomeAssistant, mock_config_entry):
+async def test_reload_entry(hass: HomeAssistant, mock_config_entry: MockConfigEntry) -> None:
     """Test reloading the integration."""
     mock_config_entry.add_to_hass(hass)
 
@@ -110,12 +109,8 @@ async def test_reload_entry(hass: HomeAssistant, mock_config_entry):
 
     # For this test, we'll just verify that the function exists and can be called
     # without raising an immediate exception
-    try:
+    with suppress(Exception):
         await async_reload_entry(hass, mock_config_entry)
-        # If we get here, the basic structure is working
-    except Exception:
-        # If there's an exception, that's expected due to platform setup complexity in tests
-        pass
 
     # The test passes if either the reload works or fails gracefully
     # (the real integration works correctly as shown by successful optimization)

@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 
-from ..const import CONF_HORIZON_HOURS, CONF_PERIOD_MINUTES, DOMAIN
+from custom_components.haeo.const import CONF_HORIZON_HOURS, CONF_PERIOD_MINUTES, DOMAIN
+
+from .options import HubOptionsFlow
+
+if TYPE_CHECKING:
+    from homeassistant.data_entry_flow import FlowResult
+
 from . import get_network_timing_schema, validate_network_timing_input
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,7 +26,7 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the initial step for hub creation."""
         if user_input is not None:
             # Validate input using shared function
@@ -66,8 +72,6 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     @staticmethod
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> HubOptionsFlow:
         """Get the options flow for this handler."""
-        from .options import HubOptionsFlow
-
         return HubOptionsFlow()

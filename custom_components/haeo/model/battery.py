@@ -1,3 +1,5 @@
+"""Battery entity for electrical system modeling."""
+
 import numpy as np
 from pulp import LpVariable
 
@@ -12,6 +14,7 @@ class Battery(Element):
         name: str,
         period: int,
         n_periods: int,
+        *,
         capacity: float,
         initial_charge_percentage: float | None = None,
         min_charge_percentage: float = 10,
@@ -21,7 +24,24 @@ class Battery(Element):
         efficiency: float = 0.99,
         charge_cost: float | None = None,
         discharge_cost: float | None = None,
-    ):
+    ) -> None:
+        """Initialize a battery entity.
+
+        Args:
+            name: Name of the battery
+            period: Time period in seconds
+            n_periods: Number of time periods
+            capacity: Battery capacity in watt-hours
+            initial_charge_percentage: Initial charge percentage (0-100), defaults to min_charge_percentage
+            min_charge_percentage: Minimum allowed charge percentage
+            max_charge_percentage: Maximum allowed charge percentage
+            max_charge_power: Maximum charging power in watts
+            max_discharge_power: Maximum discharging power in watts
+            efficiency: Battery efficiency (0-1)
+            charge_cost: Cost per watt when charging
+            discharge_cost: Cost per watt when discharging
+
+        """
         self.capacity = capacity  # Store capacity in watt-hours
 
         # Use provided initial charge percentage or default to minimum charge percentage

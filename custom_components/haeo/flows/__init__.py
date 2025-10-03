@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import collections.abc
 from dataclasses import fields
 import logging
-from typing import Any, get_type_hints
+from typing import Any, Literal, get_type_hints
 
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -15,15 +17,18 @@ from homeassistant.helpers.selector import (
 )
 import voluptuous as vol
 
-from ..const import (
+from custom_components.haeo.const import (
     CONF_HORIZON_HOURS,
     CONF_PERIOD_MINUTES,
     CONF_SOURCE,
     CONF_TARGET,
     DEFAULT_HORIZON_HOURS,
     DEFAULT_PERIOD_MINUTES,
+    MAX_HORIZON_HOURS,
+    MAX_NAME_LENGTH,
+    MAX_PERIOD_MINUTES,
 )
-from ..types import ELEMENT_TYPES
+from custom_components.haeo.types import ELEMENT_TYPES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +43,12 @@ def _create_schema_from_config_class(config_class: type, participants: dict[str,
     schema_dict = {}
 
     # Get type hints for the class
-    type_hints = get_type_hints(config_class)
+    globals_for_hints = {
+        **globals(),
+        "Sequence": collections.abc.Sequence,
+        "Literal": Literal,
+    }
+    type_hints = get_type_hints(config_class, globalns=globals_for_hints)
 
     for field_info in fields(config_class):
         field_name = field_info.name
@@ -84,17 +94,24 @@ def _create_schema_from_config_class(config_class: type, participants: dict[str,
     return vol.Schema(schema_dict)
 
 
-def get_schema(element_type: str, **kwargs) -> vol.Schema:
+def get_schema(element_type: str, **kwargs: Any) -> vol.Schema:
     """Get the appropriate schema for the given element type."""
     config_class = ELEMENT_TYPES.get(element_type)
     if config_class is None:
-        raise ValueError(f"Unknown element type: {element_type}")
+        msg = f"Unknown element type: {element_type}"
+        raise ValueError(msg)
 
     participants = kwargs.get("participants")
     return _create_schema_from_config_class(config_class, participants)
 
 
-def get_network_timing_schema(config_entry=None, include_name=False, name_required=True, current_name=None):
+def get_network_timing_schema(
+    config_entry: Any = None,
+    *,
+    include_name: bool = False,
+    name_required: bool = True,
+    current_name: str | None = None,
+) -> vol.Schema:
     """Get schema for network timing configuration.
 
     Args:
@@ -140,7 +157,13 @@ def get_network_timing_schema(config_entry=None, include_name=False, name_requir
     return vol.Schema(schema_dict)
 
 
-def validate_network_timing_input(user_input, hass=None, include_name=False, name_required=True):
+def validate_network_timing_input(
+    user_input: dict[str, Any],
+    hass: HomeAssistant | None = None,
+    *,
+    include_name: bool = False,
+    name_required: bool = True,
+) -> tuple[dict[str, str], dict[str, Any]]:
     """Validate network timing input data.
 
     Args:
@@ -157,12 +180,12 @@ def validate_network_timing_input(user_input, hass=None, include_name=False, nam
 
     # Validate horizon hours
     horizon = user_input.get(CONF_HORIZON_HOURS, DEFAULT_HORIZON_HOURS)
-    if not (1 <= horizon <= 168):
+    if not (1 <= horizon <= MAX_HORIZON_HOURS):
         errors[CONF_HORIZON_HOURS] = "invalid_horizon"
 
     # Validate period minutes
     period = user_input.get(CONF_PERIOD_MINUTES, DEFAULT_PERIOD_MINUTES)
-    if not (1 <= period <= 60):
+    if not (1 <= period <= MAX_PERIOD_MINUTES):
         errors[CONF_PERIOD_MINUTES] = "invalid_period"
 
     # Validate name if required
@@ -170,7 +193,7 @@ def validate_network_timing_input(user_input, hass=None, include_name=False, nam
         name = user_input.get("name", "").strip()
         if not name:
             errors["name"] = "name_required"
-        elif len(name) > 255:
+        elif len(name) > MAX_NAME_LENGTH:
             errors["name"] = "name_too_long"
         elif hass:
             # Check for duplicate names

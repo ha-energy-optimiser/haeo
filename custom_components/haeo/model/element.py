@@ -1,3 +1,5 @@
+"""Generic electrical entity for energy system modeling."""
+
 from collections.abc import MutableSequence, Sequence
 from dataclasses import dataclass
 
@@ -43,7 +45,7 @@ class Element:
 
         return constraints
 
-    def cost(self):
+    def cost(self) -> float:
         """Return the cost of the entity using separate consumption/production variables."""
         cost = 0
         # Handle separate consumption and production pricing

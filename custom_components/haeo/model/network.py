@@ -1,3 +1,5 @@
+"""Network class for electrical system modeling and optimization."""
+
 from collections.abc import MutableSequence, Sequence
 from dataclasses import dataclass, field
 
@@ -21,8 +23,9 @@ class Network:
     period: int
     n_periods: int
     elements: dict[str, Element] = field(default_factory=dict)
+    sensor_data_available: bool = True
 
-    def add(self, element_type: str, name: str, **kwargs) -> Element:
+    def add(self, element_type: str, name: str, **kwargs: object) -> Element:
         """Add an element to the network by type.
 
         Args:
@@ -83,7 +86,7 @@ class Network:
 
         return constraints
 
-    def cost(self):
+    def cost(self) -> float:
         """Return the cost expression for the network."""
         return lpSum([e.cost() for e in self.elements.values() if e.cost() != 0])
 
@@ -109,21 +112,12 @@ class Network:
         # Solve the problem
         status = prob.solve()
 
-        print(f"Optimization status: {LpStatus[status]}")
-
         if status == 1:  # Optimal solution found
             objective_value = value(prob.objective) if prob.objective is not None else 0.0
             # Handle PuLP return types - value() can return various types
-            if isinstance(objective_value, (int, float)):
-                total_cost = float(objective_value)
-            else:
-                # Fallback for other PuLP types
-                total_cost = 0.0
-            print(f"Debug: prob.objective = {prob.objective}")
-            print(f"Debug: total_cost = {total_cost}")
-            print(f"Debug: returning total_cost = {total_cost}")
-            return total_cost
-        raise ValueError(f"Optimization failed with status: {LpStatus[status]}")
+            return float(objective_value) if isinstance(objective_value, (int, float)) else 0.0
+        msg = f"Optimization failed with status: {LpStatus[status]}"
+        raise ValueError(msg)
 
     def validate(self) -> None:
         """Validate the network."""
@@ -131,10 +125,14 @@ class Network:
         for element in self.elements.values():
             if isinstance(element, Connection):
                 if element.source not in self.elements:
-                    raise ValueError(f"Source element '{element.source}' not found")
+                    msg = f"Source element '{element.source}' not found"
+                    raise ValueError(msg)
                 if element.target not in self.elements:
-                    raise ValueError(f"Target element '{element.target}' not found")
+                    msg = f"Target element '{element.target}' not found"
+                    raise ValueError(msg)
                 if isinstance(self.elements[element.source], Connection):
-                    raise ValueError(f"Source element '{element.source}' is a connection")
+                    msg = f"Source element '{element.source}' is a connection"
+                    raise ValueError(msg)
                 if isinstance(self.elements[element.target], Connection):
-                    raise ValueError(f"Target element '{element.target}' is a connection")
+                    msg = f"Target element '{element.target}' is a connection"
+                    raise ValueError(msg)

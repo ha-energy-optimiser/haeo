@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from pulp import value
 
 from .const import (
     ATTR_POWER,
@@ -22,7 +21,12 @@ from .const import (
     OPTIMIZATION_STATUS_SUCCESS,
 )
 from .data_loader import DataLoader
-from .model import Network
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .model import Network
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,7 +95,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.network = await self.data_loader.load_network_data(self.entry, period_seconds, n_periods)
 
             # Check if sensor data is available
-            if not getattr(self.network, "_sensor_data_available", True):
+            if not self.network.sensor_data_available:
                 self.optimization_status = OPTIMIZATION_STATUS_FAILED
                 _LOGGER.warning("Required sensor data not available, skipping optimization")
                 # Don't raise UpdateFailed here - let the sensors show as unavailable
@@ -99,14 +103,15 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Run optimization on the new network
             if not self.network:
-                raise RuntimeError("Network not initialized")
+                msg = "Network not initialized"
+                raise RuntimeError(msg)
 
             _LOGGER.debug("Running optimization for network with %d elements", len(self.network.elements))
 
             try:
                 cost = self.network.optimize()
-            except Exception as ex:
-                _LOGGER.error("Optimization failed: %s", ex)
+            except Exception:
+                _LOGGER.exception("Optimization failed")
                 raise
 
             self.optimization_result = {
@@ -121,21 +126,20 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         except Exception as ex:
             self.optimization_status = OPTIMIZATION_STATUS_FAILED
-            _LOGGER.error("Failed to update HAEO data: %s", ex)
-            raise UpdateFailed(f"Error updating HAEO data: {ex}") from ex
+            _LOGGER.exception("Failed to update HAEO data")
+            error_message = "Error updating HAEO data"
+            raise UpdateFailed(error_message) from ex
 
     def get_element_data(self, element_name: str) -> dict[str, Any] | None:
         """Get data for a specific element directly from the network."""
         if not self.network or element_name not in self.network.elements:
             return None
 
-        from pulp import value
-
         element = self.network.elements[element_name]
         element_data = {}
 
         # Helper to extract values safely
-        def extract_values(variables):
+        def extract_values(variables: list[Any]) -> list[float]:
             result = []
             for var in variables:
                 val = value(var)
@@ -170,7 +174,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return None
 
     @property
-    def last_optimization_time(self) -> Any | None:
+    def last_optimization_time(self) -> datetime | None:
         """Get the last optimization timestamp."""
         if self.optimization_result:
             return self.optimization_result["timestamp"]

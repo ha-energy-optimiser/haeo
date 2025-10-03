@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from .fields import name_field, power_field, price_forecast_field, price_sensors_field
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass

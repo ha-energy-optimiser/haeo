@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import field
+from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor.const import SensorDeviceClass
 from homeassistant.const import UnitOfPower
@@ -16,8 +16,11 @@ from homeassistant.helpers.selector import (
 )
 import voluptuous as vol
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
-def name_field(description: str, default: str = None) -> str:
+
+def name_field(description: str, *, default: str | None = None) -> str:
     """Field for element name."""
     return field(
         default=default,
@@ -28,12 +31,12 @@ def name_field(description: str, default: str = None) -> str:
     )
 
 
-def element_name_field(description: str, default: str = None) -> str:
+def element_name_field(description: str, *, default: str | None = None) -> str:
     """Field for referencing another element."""
     return field(default=default, metadata={"description": description, "schema": None})
 
 
-def power_field(description: str, optional: bool = False, default: float = None) -> float:
+def power_field(description: str, *, optional: bool = False, default: float | None = None) -> float:
     """Field for a constant power value."""
     return field(
         default=default,
@@ -57,7 +60,7 @@ def power_field(description: str, optional: bool = False, default: float = None)
     )
 
 
-def power_sensors_field(description: str, optional: bool = False) -> Sequence[str]:
+def power_sensors_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a power sensor."""
     return field(
         default_factory=list,
@@ -70,7 +73,7 @@ def power_sensors_field(description: str, optional: bool = False) -> Sequence[st
     )
 
 
-def power_forecast_field(description: str, optional: bool = False) -> Sequence[str]:
+def power_forecast_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of power forecast sensors."""
     return field(
         default_factory=list,
@@ -86,7 +89,7 @@ def power_forecast_field(description: str, optional: bool = False) -> Sequence[s
     )
 
 
-def power_flow_field(description: str, optional: bool = False, default: float = None) -> float:
+def power_flow_field(description: str, *, optional: bool = False, default: float | None = None) -> float:
     """Field for a power flow value."""
     return field(
         default=default,
@@ -104,7 +107,7 @@ def power_flow_field(description: str, optional: bool = False, default: float = 
     )
 
 
-def energy_field(description: str, optional: bool = False, default: float = None) -> float:
+def energy_field(description: str, *, optional: bool = False, default: float | None = None) -> float:
     """Field for an energy value."""
     return field(
         default=default,
@@ -123,7 +126,7 @@ def energy_field(description: str, optional: bool = False, default: float = None
     )
 
 
-def energy_sensors_field(description: str, optional: bool = False) -> Sequence[str]:
+def energy_sensors_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of energy sensors."""
     return field(
         default_factory=list,
@@ -142,7 +145,7 @@ def energy_sensors_field(description: str, optional: bool = False) -> Sequence[s
     )
 
 
-def energy_forecast_field(description: str, optional: bool = False) -> Sequence[str]:
+def energy_forecast_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of energy forecast sensors stored as attributes."""
     return field(
         default_factory=list,
@@ -157,7 +160,7 @@ def energy_forecast_field(description: str, optional: bool = False) -> Sequence[
     )
 
 
-def price_field(description: str, optional: bool = False) -> float:
+def price_field(description: str, *, optional: bool = False) -> float:
     """Field for a price value."""
     return field(
         default=None,
@@ -173,7 +176,7 @@ def price_field(description: str, optional: bool = False) -> float:
     )
 
 
-def price_sensors_field(description: str, optional: bool = False) -> Sequence[str]:
+def price_sensors_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of price sensors."""
     return field(
         default_factory=list,
@@ -192,7 +195,7 @@ def price_sensors_field(description: str, optional: bool = False) -> Sequence[st
     )
 
 
-def price_forecast_field(description: str, optional: bool = False) -> Sequence[str]:
+def price_forecast_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a sequence of price forecast sensors."""
     return field(
         default_factory=list,
@@ -211,7 +214,7 @@ def price_forecast_field(description: str, optional: bool = False) -> Sequence[s
     )
 
 
-def percentage_field(description: str, optional: bool = False, default: float = None) -> float:
+def percentage_field(description: str, *, optional: bool = False, default: float | None = None) -> float:
     """Field for a percentage value."""
     return field(
         default=default,
@@ -224,7 +227,7 @@ def percentage_field(description: str, optional: bool = False, default: float = 
     )
 
 
-def battery_soc_field(description: str, optional: bool = False, default: float = None) -> float:
+def battery_soc_field(description: str, *, optional: bool = False, default: float | None = None) -> float:
     """Field for battery state of charge percentage."""
     return field(
         default=default,
@@ -237,7 +240,7 @@ def battery_soc_field(description: str, optional: bool = False, default: float =
     )
 
 
-def battery_soc_sensor_field(description: str, optional: bool = False) -> Sequence[str]:
+def battery_soc_sensor_field(description: str, *, optional: bool = False) -> Sequence[str]:
     """Field for a battery SOC sensor."""
     return field(
         default_factory=list,
@@ -250,7 +253,7 @@ def battery_soc_sensor_field(description: str, optional: bool = False) -> Sequen
     )
 
 
-def boolean_field(description: str, optional: bool = False, default: bool = None) -> bool:
+def boolean_field(description: str, *, optional: bool = False, default: bool | None = None) -> bool:
     """Field for a boolean value."""
     return field(
         default=default,

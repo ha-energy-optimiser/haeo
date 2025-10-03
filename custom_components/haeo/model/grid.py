@@ -1,3 +1,5 @@
+"""Grid entity for electrical system modeling with separate import/export pricing."""
+
 from collections.abc import Sequence
 
 from pulp import LpVariable
@@ -13,16 +15,31 @@ class Grid(Element):
         name: str,
         period: int,
         n_periods: int,
+        *,
         import_limit: float | None = None,
         export_limit: float | None = None,
         import_price: Sequence[float] | None = None,
         export_price: Sequence[float] | None = None,
-    ):
+    ) -> None:
+        """Initialize a grid connection entity.
+
+        Args:
+            name: Name of the grid connection
+            period: Time period in seconds
+            n_periods: Number of time periods
+            import_limit: Maximum import power in watts
+            export_limit: Maximum export power in watts
+            import_price: Price per watt when importing
+            export_price: Price per watt when exporting
+
+        """
         # Validate that the forecasts match the number of periods
         if import_price is not None and len(import_price) != n_periods:
-            raise ValueError(f"import_price length ({len(import_price)}) must match n_periods ({n_periods})")
+            msg = f"import_price length ({len(import_price)}) must match n_periods ({n_periods})"
+            raise ValueError(msg)
         if export_price is not None and len(export_price) != n_periods:
-            raise ValueError(f"export_price length ({len(export_price)}) must match n_periods ({n_periods})")
+            msg = f"export_price length ({len(export_price)}) must match n_periods ({n_periods})"
+            raise ValueError(msg)
 
         # power_consumption: positive when exporting to grid (grid consuming our power)
         power_consumption = [
