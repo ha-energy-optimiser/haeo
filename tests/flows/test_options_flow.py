@@ -344,7 +344,22 @@ async def test_options_flow_init(options_flow) -> None:
 
     assert result.get("type") == FlowResultType.MENU
     menu_options = result.get("menu_options", [])
+    assert "configure_network" in menu_options
     assert "add_participant" in menu_options
+    # edit_participant and remove_participant are only available when there are participants
+    assert "edit_participant" not in menu_options
+    assert "remove_participant" not in menu_options
+
+
+async def test_options_flow_init_with_participants(options_flow_with_participants) -> None:
+    """Test options flow initialization when participants exist."""
+    result = await options_flow_with_participants.async_step_init()
+
+    assert result.get("type") == FlowResultType.MENU
+    menu_options = result.get("menu_options", [])
+    assert "configure_network" in menu_options
+    assert "add_participant" in menu_options
+    # edit_participant and remove_participant should be available when there are participants
     assert "edit_participant" in menu_options
     assert "remove_participant" in menu_options
 
@@ -473,3 +488,98 @@ async def test_options_flow_manage_participants_form(options_flow_with_minimal_p
     result = await options_flow_with_minimal_participants.async_step_edit_participant()
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == "edit_participant"
+
+
+# Schema generation tests
+def test_get_schema_grid_flattened_fields() -> None:
+    """Test that grid schema generates flattened field names."""
+    schema = get_schema(ELEMENT_TYPE_GRID)
+
+    # Check that flattened fields are generated
+    flattened_fields = []
+    for key in schema.schema:
+        key_str = str(key)
+        if "price" in key_str and ("_live" in key_str or "_forecast" in key_str):
+            flattened_fields.append(key_str)
+
+    # Should have both import and export price fields with live and forecast
+    expected_fields = ["import_price_live", "import_price_forecast", "export_price_live", "export_price_forecast"]
+
+    for expected in expected_fields:
+        assert expected in flattened_fields, f"Expected field {expected} not found in schema"
+
+
+def test_get_schema_grid_field_types() -> None:
+    """Test that grid schema has correct field types for flattened fields."""
+    schema = get_schema(ELEMENT_TYPE_GRID)
+
+    # Check that flattened fields have EntitySelector schemas
+    for key in schema.schema:
+        key_str = str(key)
+        if "price" in key_str and ("_live" in key_str or "_forecast" in key_str):
+            field_schema = schema.schema[key]
+            # Should be an EntitySelector for sensor selection
+            # EntitySelector objects are callable classes, so we check the class name
+            assert "EntitySelector" in str(type(field_schema)), f"Field {key_str} should be an EntitySelector"
+
+
+def test_get_schema_other_elements_no_flattening() -> None:
+    """Test that non-price fields don't get flattened."""
+    # Test battery schema - should not have flattened fields
+    schema = get_schema(ELEMENT_TYPE_BATTERY)
+
+    flattened_fields = []
+    for key in schema.schema:
+        key_str = str(key)
+        if "price" in key_str and ("_live" in key_str or "_forecast" in key_str):
+            flattened_fields.append(key_str)
+
+    # Battery should not have price fields
+    assert len(flattened_fields) == 0, (
+        f"Battery schema should not have flattened price fields, but found: {flattened_fields}"
+    )
+
+
+def test_get_schema_connection_no_flattening() -> None:
+    """Test that connection schema doesn't get flattened (only has source/target)."""
+    schema = get_schema(ELEMENT_TYPE_CONNECTION)
+
+    flattened_fields = []
+    for key in schema.schema:
+        key_str = str(key)
+        if "price" in key_str and ("_live" in key_str or "_forecast" in key_str):
+            flattened_fields.append(key_str)
+
+    # Connection should not have price fields
+    assert len(flattened_fields) == 0, (
+        f"Connection schema should not have flattened price fields, but found: {flattened_fields}"
+    )
+
+
+def test_get_schema_grid_is_only_element_with_price_fields() -> None:
+    """Test that only grid element has flattened price fields."""
+    # Test grid - should have price fields
+    grid_schema = get_schema(ELEMENT_TYPE_GRID)
+    grid_price_fields = []
+    for key in grid_schema.schema:
+        key_str = str(key)
+        if "price" in key_str and ("_live" in key_str or "_forecast" in key_str):
+            grid_price_fields.append(key_str)
+
+    expected_grid_fields = ["import_price_live", "import_price_forecast", "export_price_live", "export_price_forecast"]
+
+    for expected in expected_grid_fields:
+        assert expected in grid_price_fields, f"Expected field {expected} not found in grid schema"
+
+    # Test forecast_load - should NOT have price fields
+    forecast_load_schema = get_schema(ELEMENT_TYPE_FORECAST_LOAD)
+    forecast_load_price_fields = []
+    for key in forecast_load_schema.schema:
+        key_str = str(key)
+        if "price" in key_str and ("_live" in key_str or "_forecast" in key_str):
+            forecast_load_price_fields.append(key_str)
+
+    # Forecast load should not have price fields
+    assert len(forecast_load_price_fields) == 0, (
+        f"Forecast load should not have price fields, but found: {forecast_load_price_fields}"
+    )

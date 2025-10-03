@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+import numpy as np
 from pulp import LpVariable
 
 from .element import Element
@@ -18,8 +19,8 @@ class Grid(Element):
         *,
         import_limit: float | None = None,
         export_limit: float | None = None,
-        import_price: Sequence[float] | None = None,
-        export_price: Sequence[float] | None = None,
+        import_price: Sequence[float] | float | None = None,
+        export_price: Sequence[float] | float | None = None,
     ) -> None:
         """Initialize a grid connection entity.
 
@@ -33,13 +34,6 @@ class Grid(Element):
             export_price: Price per watt when exporting
 
         """
-        # Validate that the forecasts match the number of periods
-        if import_price is not None and len(import_price) != n_periods:
-            msg = f"import_price length ({len(import_price)}) must match n_periods ({n_periods})"
-            raise ValueError(msg)
-        if export_price is not None and len(export_price) != n_periods:
-            msg = f"export_price length ({len(export_price)}) must match n_periods ({n_periods})"
-            raise ValueError(msg)
 
         # power_consumption: positive when exporting to grid (grid consuming our power)
         power_consumption = [
@@ -56,6 +50,10 @@ class Grid(Element):
             n_periods=n_periods,
             power_consumption=power_consumption,  # Consuming = exporting (grid consuming our power)
             power_production=power_production,  # Producing = importing (grid producing power for us)
-            price_consumption=export_price,  # Revenue when exporting (grid pays us)
-            price_production=import_price,  # Cost when importing (we pay grid)
+            price_consumption=None
+            if export_price is None
+            else (np.ones(n_periods) * export_price).tolist(),  # Revenue when exporting (grid pays us)
+            price_production=None
+            if import_price is None
+            else (np.ones(n_periods) * import_price).tolist(),  # Cost when importing (we pay grid)
         )

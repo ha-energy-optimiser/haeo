@@ -142,7 +142,7 @@ def get_network_timing_schema(
     # Add horizon hours field
     current_horizon = DEFAULT_HORIZON_HOURS
     if config_entry:
-        current_horizon = config_entry.data.get(CONF_HORIZON_HOURS, DEFAULT_HORIZON_HOURS)
+        current_horizon = int(config_entry.data.get(CONF_HORIZON_HOURS, DEFAULT_HORIZON_HOURS))
 
     schema_dict[vol.Required(CONF_HORIZON_HOURS, default=current_horizon)] = NumberSelector(
         NumberSelectorConfig(min=1, max=168, step=1, mode="slider"),
@@ -151,7 +151,7 @@ def get_network_timing_schema(
     # Add period minutes field
     current_period = DEFAULT_PERIOD_MINUTES
     if config_entry:
-        current_period = config_entry.data.get(CONF_PERIOD_MINUTES, DEFAULT_PERIOD_MINUTES)
+        current_period = int(config_entry.data.get(CONF_PERIOD_MINUTES, DEFAULT_PERIOD_MINUTES))
 
     schema_dict[vol.Required(CONF_PERIOD_MINUTES, default=current_period)] = NumberSelector(
         NumberSelectorConfig(min=1, max=60, step=1, mode="slider"),
@@ -182,12 +182,12 @@ def validate_network_timing_input(
     errors = {}
 
     # Validate horizon hours
-    horizon = user_input.get(CONF_HORIZON_HOURS, DEFAULT_HORIZON_HOURS)
+    horizon = int(user_input.get(CONF_HORIZON_HOURS, DEFAULT_HORIZON_HOURS))
     if not (1 <= horizon <= MAX_HORIZON_HOURS):
         errors[CONF_HORIZON_HOURS] = "invalid_horizon"
 
     # Validate period minutes
-    period = user_input.get(CONF_PERIOD_MINUTES, DEFAULT_PERIOD_MINUTES)
+    period = int(user_input.get(CONF_PERIOD_MINUTES, DEFAULT_PERIOD_MINUTES))
     if not (1 <= period <= MAX_PERIOD_MINUTES):
         errors[CONF_PERIOD_MINUTES] = "invalid_period"
 

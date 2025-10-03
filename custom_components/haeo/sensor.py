@@ -5,7 +5,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -114,6 +114,7 @@ def _create_sensors(
     # Add hub-level optimization sensors
     entities.append(HaeoOptimizationCostSensor(coordinator, config_entry))
     entities.append(HaeoOptimizationStatusSensor(coordinator, config_entry))
+    entities.append(HaeoOptimizationDurationSensor(coordinator, config_entry))
 
     # Add element-specific sensors
     participants = config_entry.data.get("participants", {})
@@ -145,8 +146,8 @@ def _get_element_sensor_configs(
 
     # Check if we have optimization data for this element
     optimization_result = coordinator.optimization_result
-    if optimization_result:
-        solution = optimization_result.get("solution", {})
+    if optimization_result and "solution" in optimization_result:
+        solution = optimization_result["solution"]
         has_power_data = f"{element_name}_{ATTR_POWER}" in solution
         has_energy_data = f"{element_name}_{ATTR_ENERGY}" in solution
     else:
@@ -243,26 +244,24 @@ class HaeoOptimizationCostSensor(HaeoSensorBase):
         super().__init__(coordinator, config_entry, "optimization_cost", "Optimization Cost")
         self._attr_device_class = SensorDeviceClass.MONETARY
         self._attr_native_unit_of_measurement = UNIT_CURRENCY
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_state_class = SensorStateClass.TOTAL
         self._attr_translation_key = "optimization_cost"
 
-        # Set initial values from coordinator
-        self._attr_native_value = self.coordinator.last_optimization_cost
-        attrs = {}
-        if self.coordinator.last_optimization_time:
-            attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
-        attrs["optimization_status"] = self.coordinator.optimization_status
-        self._attr_extra_state_attributes = attrs
+    @property
+    def native_value(self) -> float | None:
+        """Return the optimization cost."""
+        return self.coordinator.last_optimization_cost
 
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self._attr_native_value = self.coordinator.last_optimization_cost
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes."""
         attrs = {}
         if self.coordinator.last_optimization_time:
             attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
         attrs["optimization_status"] = self.coordinator.optimization_status
-        self._attr_extra_state_attributes = attrs
-        super()._handle_coordinator_update()
+        if self.coordinator.last_optimization_duration is not None:
+            attrs["last_duration_seconds"] = self.coordinator.last_optimization_duration
+        return attrs
 
 
 class HaeoOptimizationStatusSensor(HaeoSensorBase):
@@ -297,6 +296,38 @@ class HaeoOptimizationStatusSensor(HaeoSensorBase):
             attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
         if self.coordinator.last_optimization_cost is not None:
             attrs["last_cost"] = self.coordinator.last_optimization_cost
+        if self.coordinator.last_optimization_duration is not None:
+            attrs["last_duration_seconds"] = self.coordinator.last_optimization_duration
+        return attrs
+
+
+class HaeoOptimizationDurationSensor(HaeoSensorBase):
+    """Sensor for optimization duration."""
+
+    def __init__(
+        self,
+        coordinator: HaeoDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, config_entry, "optimization_duration", "Optimization Duration")
+        self._attr_device_class = SensorDeviceClass.DURATION
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_translation_key = "optimization_duration"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the optimization duration in seconds."""
+        return self.coordinator.last_optimization_duration
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes."""
+        attrs = {}
+        if self.coordinator.last_optimization_time:
+            attrs["last_optimization"] = self.coordinator.last_optimization_time.isoformat()
+        attrs["optimization_status"] = self.coordinator.optimization_status
         return attrs
 
 
@@ -386,7 +417,7 @@ class HaeoElementEnergySensor(HaeoSensorBase):
         self.element_name = element_name
         self._attr_device_class = SensorDeviceClass.ENERGY_STORAGE
         self._attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
-        self._attr_state_class = SensorStateClass.TOTAL
+        self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_translation_key = "energy"
 
     @property

@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import Any, Literal
 
-from .fields import name_field, power_field, price_forecast_field, price_sensors_field
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from .fields import name_field, power_field, price_live_forecast_field
 
 
 @dataclass
@@ -19,11 +16,8 @@ class GridConfig:
 
     name: str = name_field("Grid connection name")
 
-    import_price: Sequence[str] = price_sensors_field("Sensor for current import price")
-    export_price: Sequence[str] = price_sensors_field("Sensor for current export price")
-
-    import_price_forecast: Sequence[str] = price_forecast_field("Sensor(s) for import price forecast")
-    export_price_forecast: Sequence[str] = price_forecast_field("Sensor(s) for export price forecast")
+    import_price: dict[str, Any] = price_live_forecast_field("Import price configuration (live sensor + forecast)")
+    export_price: dict[str, Any] = price_live_forecast_field("Export price configuration (live sensor + forecast)")
 
     import_limit: float | None = power_field("Maximum import power in W", optional=True)
     export_limit: float | None = power_field("Maximum export power in W", optional=True)

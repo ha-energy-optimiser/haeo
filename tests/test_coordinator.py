@@ -119,10 +119,13 @@ async def test_update_data_failure(mock_optimize, hass: HomeAssistant, mock_conf
     mock_optimize.side_effect = Exception("Optimization failed")
 
     with patch.object(hass, "async_add_executor_job", side_effect=Exception("Optimization failed")):
-        with pytest.raises(UpdateFailed):
-            await coordinator._async_update_data()
+        result = await coordinator._async_update_data()
 
+    # Should return dict with None cost for optimization failures during configuration
+    assert result is not None
+    assert result["cost"] is None
     assert coordinator.optimization_status == OPTIMIZATION_STATUS_FAILED
+    assert coordinator.optimization_result is None
 
 
 def test_get_element_data(hass: HomeAssistant, mock_config_entry) -> None:

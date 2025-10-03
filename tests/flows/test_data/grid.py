@@ -24,8 +24,10 @@ VALID_DATA = [
             CONF_NAME: "Smart Grid",
             CONF_IMPORT_LIMIT: 8000,
             CONF_EXPORT_LIMIT: 5000,
-            CONF_IMPORT_PRICE: ["sensor.smart_grid_import_price"],
-            CONF_EXPORT_PRICE: ["sensor.smart_grid_export_price"],
+            f"{CONF_IMPORT_PRICE}_live": "sensor.smart_grid_import_price",
+            f"{CONF_IMPORT_PRICE}_forecast": ["sensor.smart_grid_import_price"],
+            f"{CONF_EXPORT_PRICE}_live": "sensor.smart_grid_export_price",
+            f"{CONF_EXPORT_PRICE}_forecast": ["sensor.smart_grid_export_price"],
         },
     },
 ]

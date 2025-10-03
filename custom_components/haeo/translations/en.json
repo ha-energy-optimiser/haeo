@@ -3,6 +3,7 @@
     "sensor": {
       "optimization_cost": "Optimization Cost",
       "optimization_status": "Optimization Status",
+      "optimization_duration": "Optimization Duration",
       "power": "Power",
       "energy": "Energy"
     },
@@ -49,18 +50,10 @@
         }
       },
       "add_participant": {
+        "title": "Add Device",
+        "description": "Select a device to add to the network",
         "data": {
-          "participant_type": {
-            "options": {
-              "battery": "Battery",
-              "grid": "Grid Connection",
-              "constant_load": "Constant Load",
-              "forecast_load": "Forecast Load",
-              "generator": "Generator",
-              "net": "Network Node",
-              "connection": "Connection"
-            }
-          }
+          "participant_type": "Device Type"
         }
       },
       "manage_participants": {
@@ -98,10 +91,22 @@
           "name": "Grid Connection Name",
           "import_limit": "Import Limit (Optional)",
           "export_limit": "Export Limit (Optional)",
-          "import_price_forecast": "Import Price Forecast (Optional)",
-          "export_price_forecast": "Export Price Forecast (Optional)",
-          "import_price": "Import Price Sensor",
-          "export_price": "Export Price Sensor"
+          "import_price": {
+            "name": "Import Price Configuration",
+            "description": "Configure both live and forecast import prices",
+            "data": {
+              "live": "Live Import Price Sensor",
+              "forecast": "Import Price Forecast Sensors"
+            }
+          },
+          "export_price": {
+            "name": "Export Price Configuration",
+            "description": "Configure both live and forecast export prices",
+            "data": {
+              "live": "Live Export Price Sensor",
+              "forecast": "Export Price Forecast Sensors"
+            }
+          }
         }
       },
       "configure_load": {
@@ -167,7 +172,8 @@
       "min_power_negative_not_allowed_unidirectional": "Minimum power cannot be negative for unidirectional connections"
     },
     "abort": {
-      "no_participants": "No devices are currently connected to this network"
+      "no_participants": "No devices are currently connected to this network",
+      "reload_failed": "Failed to reload the integration after configuration changes. Please check your configuration and try again."
     }
   }
 }

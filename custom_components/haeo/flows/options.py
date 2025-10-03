@@ -8,20 +8,17 @@ from typing import TYPE_CHECKING, Any
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers.selector import SelectOptionDict, SelectSelector, SelectSelectorConfig, SelectSelectorMode
+from homeassistant.helpers.translation import async_get_translations
 import voluptuous as vol
 
-from custom_components.haeo.const import (
-    CONF_ELEMENT_TYPE,
-    CONF_HORIZON_HOURS,
-    CONF_PERIOD_MINUTES,
-    ELEMENT_TYPE_TRANSLATION_KEYS,
-)
+from custom_components.haeo.const import CONF_ELEMENT_TYPE, CONF_HORIZON_HOURS, CONF_PERIOD_MINUTES
 
 if TYPE_CHECKING:
     from homeassistant.data_entry_flow import FlowResult
+
 from custom_components.haeo.types import ELEMENT_TYPES
 
-from . import get_network_timing_schema, get_schema, validate_network_timing_input
+from . import get_network_timing_schema, get_schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,39 +28,32 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, _user_input: dict[str, Any] | None = None) -> FlowResult:
         """Manage the options."""
-        # user_input is not used in this step, just show the menu
+        # Check if we have participants for conditional menu options
+        participants = self.config_entry.data.get("participants", {})
+
+        # Build menu options based on available participants
+        menu_options = ["configure_network", "add_participant"]
+
+        if participants:
+            menu_options.extend(["edit_participant", "remove_participant"])
+
         return self.async_show_menu(
             step_id="init",
-            menu_options=["configure_network", "add_participant", "edit_participant", "remove_participant"],
+            menu_options=menu_options,
         )
 
     async def async_step_configure_network(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Configure network timing parameters."""
         if user_input is not None:
-            # Validate input using shared function
-            errors, validated_data = validate_network_timing_input(user_input)
-
-            if errors:
-                data_schema = get_network_timing_schema(config_entry=self.config_entry)
-                return self.async_show_form(
-                    step_id="configure_network",
-                    data_schema=data_schema,
-                    errors=errors,
-                )
-
             # Update network timing configuration
             new_data = self.config_entry.data.copy()
-            new_data[CONF_HORIZON_HOURS] = validated_data[CONF_HORIZON_HOURS]
-            new_data[CONF_PERIOD_MINUTES] = validated_data[CONF_PERIOD_MINUTES]
+            new_data[CONF_HORIZON_HOURS] = user_input[CONF_HORIZON_HOURS]
+            new_data[CONF_PERIOD_MINUTES] = user_input[CONF_PERIOD_MINUTES]
 
             self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
 
-            # Reload the integration to ensure devices are updated
-            try:
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-            except Exception as ex:
-                _LOGGER.warning("Failed to reload integration after updating network config: %s", ex)
-
+            # Reload the integration once so new timing takes effect
+            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
             return self.async_create_entry(title="", data={})
 
         # Show form with network timing configuration
@@ -82,19 +72,25 @@ class HubOptionsFlow(config_entries.OptionsFlow):
             # Route to generic configuration step
             return await self.async_step_configure_element(participant_type)
 
-        # Show participant type selection
-        participant_types = [
-            SelectOptionDict(value=element_type, label=ELEMENT_TYPE_TRANSLATION_KEYS[element_type])
+        # Get translations for options
+        translations = await async_get_translations(
+            self.hass, self.hass.config.language, "options", integrations=["haeo"], config_flow=True
+        )
+
+        # Create options with translated labels
+        options = [
+            SelectOptionDict(value=element_type, label=translations.get(f"entity.device.{element_type}", element_type))
             for element_type in ELEMENT_TYPES
         ]
 
+        # Show participant type selection with proper i18n support
         return self.async_show_form(
             step_id="add_participant",
             data_schema=vol.Schema(
                 {
                     vol.Required("participant_type"): SelectSelector(
                         SelectSelectorConfig(
-                            options=participant_types,
+                            options=options,
                             mode=SelectSelectorMode.DROPDOWN,
                         ),
                     ),
@@ -185,12 +181,7 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
             self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
 
-            # Reload the integration to ensure devices are updated
-            try:
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-            except Exception as ex:
-                _LOGGER.warning("Failed to reload integration after removing participant: %s", ex)
-
+            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
             return self.async_create_entry(title="", data={})
 
         # Show form for participant selection
@@ -228,12 +219,7 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
         self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
 
-        # Reload the integration to ensure devices are registered
-        try:
-            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-        except Exception as ex:
-            _LOGGER.warning("Failed to reload integration after adding participant: %s", ex)
-
+        await self.hass.config_entries.async_reload(self.config_entry.entry_id)
         return self.async_create_entry(title="", data={})
 
     async def _update_participant(self, old_name: str, new_config: dict[str, Any]) -> FlowResult:
@@ -252,10 +238,37 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
         self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
 
-        # Reload the integration to ensure devices are registered
-        try:
-            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-        except Exception as ex:
-            _LOGGER.warning("Failed to reload integration after adding participant: %s", ex)
-
         return self.async_create_entry(title="", data={})
+
+
+# Dynamically create specific configure methods for each element type
+def _create_configure_methods() -> None:
+    """Create specific configure methods for each element type."""
+    for element_type in ELEMENT_TYPES:
+        method_name = f"async_step_configure_{element_type}"
+
+        # Only create if it doesn't already exist
+        if not hasattr(HubOptionsFlow, method_name):
+            # Capture the current values for the closure
+            current_elem_type = element_type
+
+            def create_configure_method(elem_type: str = current_elem_type, method_nm: str = method_name) -> Any:
+                async def configure_method(
+                    self: HubOptionsFlow,
+                    user_input: dict[str, Any] | None = None,
+                    current_config: dict[str, Any] | None = None,
+                ) -> FlowResult:
+                    """Configure element."""
+                    # Call the generic method with the correct signature
+                    return await self.async_step_configure_element(elem_type, user_input, current_config)
+
+                configure_method.__name__ = method_nm
+                return configure_method
+
+            # Set the method on the class
+            method = create_configure_method()
+            setattr(HubOptionsFlow, method_name, method)
+
+
+# Create the methods when the module is imported
+_create_configure_methods()

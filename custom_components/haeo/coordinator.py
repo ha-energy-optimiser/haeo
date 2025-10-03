@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from pulp import value
 
@@ -59,6 +60,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.network: Network | None = None
         self.optimization_result: dict[str, Any] | None = None
         self.optimization_status = OPTIMIZATION_STATUS_PENDING
+        self._last_optimization_duration: float | None = None
         self.data_loader = DataLoader(hass)
 
         super().__init__(
@@ -82,8 +84,11 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return timestamps
 
-    async def _async_update_data(self) -> dict[str, Any] | None:
+    async def _async_update_data(self) -> dict[str, Any]:
         """Update data from Home Assistant entities and run optimization."""
+        # Start timing the entire optimization process
+        start_time = time.time()
+
         try:
             # Calculate time parameters from configuration
             period_seconds, n_periods = _calculate_time_parameters(
@@ -99,30 +104,41 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.optimization_status = OPTIMIZATION_STATUS_FAILED
                 _LOGGER.warning("Required sensor data not available, skipping optimization")
                 # Don't raise UpdateFailed here - let the sensors show as unavailable
-                return None
+                end_time = time.time()
+                self._last_optimization_duration = end_time - start_time
+                return {"cost": None, "timestamp": dt_util.utcnow(), "duration": self.last_optimization_duration}
 
+            # Run optimization in executor job to avoid blocking the event loop
             _LOGGER.debug("Running optimization for network with %d elements", len(self.network.elements))
+            cost = await self.hass.async_add_executor_job(self.network.optimize)
 
-            try:
-                # Run optimization in executor job to avoid blocking the event loop
-                cost = await self.hass.async_add_executor_job(self.network.optimize)
-            except Exception:
-                _LOGGER.exception("Optimization failed")
-                raise
+            # End timing after successful optimization
+            end_time = time.time()
+            self._last_optimization_duration = end_time - start_time
 
             self.optimization_result = {
                 "cost": cost,
                 "timestamp": dt_util.utcnow(),
+                "duration": self.last_optimization_duration,
             }
             self.optimization_status = OPTIMIZATION_STATUS_SUCCESS
 
-            _LOGGER.debug("Optimization completed successfully with cost: %s", cost)
+            _LOGGER.debug(
+                "Optimization completed successfully with cost: %s in %.3f seconds",
+                cost,
+                self.last_optimization_duration,
+            )
 
-        except Exception as ex:
+        except Exception:
+            # End timing even when optimization fails
+            end_time = time.time()
+            self._last_optimization_duration = end_time - start_time
+
+            # If any exception occurs, mark the optimisation as failed and return a placeholder result
             self.optimization_status = OPTIMIZATION_STATUS_FAILED
-            _LOGGER.exception("Failed to update HAEO data")
-            error_message = "Error updating HAEO data"
-            raise UpdateFailed(error_message) from ex
+            _LOGGER.exception("Unhandled exception in HAEO update loop - optimisation marked failed")
+            self.optimization_result = None
+            return {"cost": None, "timestamp": dt_util.utcnow(), "duration": self.last_optimization_duration}
 
         return self.optimization_result
 
@@ -175,3 +191,8 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.optimization_result:
             return self.optimization_result["timestamp"]
         return None
+
+    @property
+    def last_optimization_duration(self) -> float | None:
+        """Get the last optimization duration in seconds."""
+        return self._last_optimization_duration

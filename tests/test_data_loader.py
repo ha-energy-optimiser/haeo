@@ -1,6 +1,7 @@
 """Test the HAEO sensor loader."""
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from homeassistant.components.sensor.const import SensorDeviceClass
 from homeassistant.const import UnitOfPower
@@ -34,6 +35,13 @@ class MockConfigWithBatterySensor:
     """Mock config class with battery sensor field."""
 
     initial_charge_percentage: str = field(metadata={"field_type": (SensorDeviceClass.BATTERY, FIELD_TYPE_SENSOR)})
+
+
+@dataclass
+class MockConfigWithLiveForecastPrice:
+    """Mock config class with live_forecast price field."""
+
+    import_price: dict[str, Any] = field(metadata={"field_type": (SensorDeviceClass.MONETARY, "live_forecast")})
 
 
 @dataclass
@@ -502,3 +510,189 @@ async def test_load_field_data_unknown_field_type(hass: HomeAssistant, sensor_lo
     # This would use a field that doesn't have field_type metadata
     result = await sensor_loader.load_field_data("unknown_field", "test_value", MockConfigWithBatterySensor, 3)
     assert result == "test_value"  # Should return as-is
+
+
+async def test_load_field_data_live_forecast_both_sensors(hass: HomeAssistant, sensor_loader: DataLoader) -> None:
+    """Test loading live_forecast field data with both live and forecast sensors."""
+    # Set up mock sensor states
+    hass.states.async_set("sensor.live_price", "0.15", {"device_class": "monetary"})
+    hass.states.async_set("sensor.forecast_1", "0.16", {"device_class": "monetary", "forecast": [0.16, 0.17, 0.18]})
+    hass.states.async_set("sensor.forecast_2", "0.14", {"device_class": "monetary", "forecast": [0.14, 0.15, 0.16]})
+
+    # Test with both live and forecast sensors
+    field_value = {"live": "sensor.live_price", "forecast": ["sensor.forecast_1", "sensor.forecast_2"]}
+
+    result = await sensor_loader.load_field_data("import_price", field_value, MockConfigWithLiveForecastPrice, 3)
+
+    # Should return forecast data with first element replaced by live value
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert result[0] == 0.15  # Live value
+    assert result[1] == pytest.approx(0.32)  # Sum of forecast sensors for period 1 (0.17 + 0.15)
+    assert result[2] == pytest.approx(0.34)  # Sum of forecast sensors for period 2 (0.18 + 0.16)
+
+
+async def test_load_field_data_live_forecast_only_live(hass: HomeAssistant, sensor_loader: DataLoader) -> None:
+    """Test loading live_forecast field data with only live sensor."""
+    # Set up mock sensor state
+    hass.states.async_set("sensor.live_price", "0.20", {"device_class": "monetary"})
+
+    # Test with only live sensor
+    field_value = {"live": "sensor.live_price"}
+
+    result = await sensor_loader.load_field_data("import_price", field_value, MockConfigWithLiveForecastPrice, 3)
+
+    # Should return live value repeated for all periods
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert result == [0.20, 0.20, 0.20]
+
+
+async def test_load_field_data_live_forecast_only_forecast(hass: HomeAssistant, sensor_loader: DataLoader) -> None:
+    """Test loading live_forecast field data with only forecast sensors."""
+    # Set up mock sensor states
+    hass.states.async_set("sensor.forecast_1", "0.16", {"device_class": "monetary", "forecast": [0.16, 0.17, 0.18]})
+    hass.states.async_set("sensor.forecast_2", "0.14", {"device_class": "monetary", "forecast": [0.14, 0.15, 0.16]})
+
+    # Test with only forecast sensors
+    field_value = {"forecast": ["sensor.forecast_1", "sensor.forecast_2"]}
+
+    result = await sensor_loader.load_field_data("import_price", field_value, MockConfigWithLiveForecastPrice, 3)
+
+    # Should return forecast data (sum of sensors)
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert result[0] == pytest.approx(0.30)  # Sum of forecast sensors for period 0 (0.16 + 0.14)
+    assert result[1] == pytest.approx(0.32)  # Sum of forecast sensors for period 1 (0.17 + 0.15)
+    assert result[2] == pytest.approx(0.34)  # Sum of forecast sensors for period 2 (0.18 + 0.16)
+
+
+async def test_load_field_data_live_forecast_no_sensors(hass: HomeAssistant, sensor_loader: DataLoader) -> None:
+    """Test loading live_forecast field data with no sensors."""
+    # Test with empty dict
+    field_value = {}
+
+    result = await sensor_loader.load_field_data("import_price", field_value, MockConfigWithLiveForecastPrice, 3)
+
+    # Should return the field value as-is
+    assert result == {}
+
+
+async def test_load_field_data_live_forecast_invalid_field_value(
+    hass: HomeAssistant, sensor_loader: DataLoader
+) -> None:
+    """Test loading live_forecast field data with invalid field value."""
+    # Test with string instead of dict
+    field_value = "invalid_string"
+
+    result = await sensor_loader.load_field_data("import_price", field_value, MockConfigWithLiveForecastPrice, 3)
+
+    # Should return the field value as-is
+    assert result == "invalid_string"
+
+
+# Nested parameter reconstruction tests
+def test_reconstruct_nested_params_basic() -> None:
+    """Test basic reconstruction of nested parameters."""
+    # Test with flattened price fields
+    element_params = {
+        "name": "Test Grid",
+        "import_price_live": "sensor.price_import",
+        "import_price_forecast": ["sensor.price_forecast_1", "sensor.price_forecast_2"],
+        "export_price_live": "sensor.price_export",
+        "export_price_forecast": ["sensor.price_forecast_export_1"],
+        "import_limit": 1000,
+        "export_limit": 800,
+    }
+
+    # Import the method directly for testing
+    from custom_components.haeo.data_loader import DataLoader
+
+    # Create a mock hass for the DataLoader
+    class MockHass:
+        pass
+
+    loader = DataLoader(MockHass())
+
+    reconstructed = loader._reconstruct_nested_params(element_params)
+
+    expected = {
+        "name": "Test Grid",
+        "import_limit": 1000,
+        "export_limit": 800,
+        "import_price": {
+            "live": "sensor.price_import",
+            "forecast": ["sensor.price_forecast_1", "sensor.price_forecast_2"],
+        },
+        "export_price": {"live": "sensor.price_export", "forecast": ["sensor.price_forecast_export_1"]},
+    }
+
+    assert reconstructed == expected
+
+
+def test_reconstruct_nested_params_no_flattened() -> None:
+    """Test reconstruction when no flattened fields are present."""
+    element_params = {"name": "Test Battery", "capacity": 10000, "efficiency": 0.95}
+
+    from custom_components.haeo.data_loader import DataLoader
+
+    class MockHass:
+        pass
+
+    loader = DataLoader(MockHass())
+
+    reconstructed = loader._reconstruct_nested_params(element_params)
+
+    # Should return unchanged since no flattened fields
+    assert reconstructed == element_params
+
+
+def test_reconstruct_nested_params_mixed_fields() -> None:
+    """Test reconstruction with mix of flattened and regular fields."""
+    element_params = {
+        "name": "Test Grid",
+        "import_price_live": "sensor.price_import",
+        "capacity": 5000,  # Regular field
+        "import_price_forecast": ["sensor.price_forecast_1"],
+        "efficiency": 0.9,  # Regular field
+    }
+
+    from custom_components.haeo.data_loader import DataLoader
+
+    class MockHass:
+        pass
+
+    loader = DataLoader(MockHass())
+
+    reconstructed = loader._reconstruct_nested_params(element_params)
+
+    expected = {
+        "name": "Test Grid",
+        "capacity": 5000,
+        "efficiency": 0.9,
+        "import_price": {"live": "sensor.price_import", "forecast": ["sensor.price_forecast_1"]},
+    }
+
+    assert reconstructed == expected
+
+
+def test_reconstruct_nested_params_invalid_format() -> None:
+    """Test reconstruction with invalid flattened field format."""
+    element_params = {
+        "name": "Test Grid",
+        "import_price_invalid": "sensor.price",  # Invalid suffix
+        "export_price_also_invalid": ["sensor.price"],  # Invalid suffix
+        "regular_field": 1000,
+    }
+
+    from custom_components.haeo.data_loader import DataLoader
+
+    class MockHass:
+        pass
+
+    loader = DataLoader(MockHass())
+
+    reconstructed = loader._reconstruct_nested_params(element_params)
+
+    # Should return unchanged since fields don't match expected pattern
+    assert reconstructed == element_params
