@@ -1,13 +1,20 @@
 {
   "entity": {
+    "sensor": {
+      "optimization_cost": "Optimization Cost",
+      "optimization_status": "Optimization Status",
+      "power": "Power",
+      "energy": "Energy"
+    },
     "device": {
       "battery": "Battery",
-      "grid_connection": "Grid Connection",
+      "grid": "Grid Connection",
       "constant_load": "Constant Load",
       "forecast_load": "Forecast Load",
       "generator": "Generator",
-      "network_node": "Network Node",
-      "connection": "Connection"
+      "net": "Network Node",
+      "connection": "Connection",
+      "network": "Network"
     }
   },
   "config": {
@@ -35,16 +42,25 @@
         "title": "HAEO Network Configuration",
         "description": "Manage your HAEO network and its connected devices",
         "menu_options": {
+          "configure_network": "Configure Network",
           "add_participant": "Add Device",
-          "manage_participants": "View Devices",
+          "edit_participant": "Edit Device",
           "remove_participant": "Remove Device"
         }
       },
       "add_participant": {
-        "title": "Add Device",
-        "description": "Choose the type of device to add to your HAEO network",
         "data": {
-          "participant_type": "Device Type"
+          "participant_type": {
+            "options": {
+              "battery": "Battery",
+              "grid": "Grid Connection",
+              "constant_load": "Constant Load",
+              "forecast_load": "Forecast Load",
+              "generator": "Generator",
+              "net": "Network Node",
+              "connection": "Connection"
+            }
+          }
         }
       },
       "manage_participants": {
@@ -124,6 +140,21 @@
           "target": "Target Device",
           "min_power": "Minimum Power (negative for bidirectional)",
           "max_power": "Maximum Power"
+        }
+      },
+      "configure_network": {
+        "title": "Configure Network Settings",
+        "description": "Adjust the optimization horizon and time period for your HAEO network",
+        "data": {
+          "horizon_hours": "Optimization Horizon (hours)",
+          "period_minutes": "Time Period (minutes)"
+        }
+      },
+      "edit_participant": {
+        "title": "Edit Device",
+        "description": "Select a device to edit its configuration",
+        "data": {
+          "participant": "Device to Edit"
         }
       }
     },

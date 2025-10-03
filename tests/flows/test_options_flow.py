@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from homeassistant.const import CONF_NAME
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
-from pytest import MonkeyPatch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.haeo.const import (
@@ -195,7 +194,7 @@ def valid_element_data(element_type):
 
 @pytest.fixture
 def config_entry():
-    """Basic config entry fixture for testing."""
+    """Create basic config entry fixture for testing."""
     return create_mock_config_entry()
 
 
@@ -226,7 +225,7 @@ def config_entry_with_participants(element_type, valid_element_data):
 
 @pytest.fixture
 def options_flow(hass, config_entry):
-    """Configured options flow fixture."""
+    """Create configured options flow fixture."""
     options_flow = HubOptionsFlow()
     options_flow.hass = hass
     options_flow._config_entry = config_entry
@@ -246,17 +245,6 @@ def config_entry_minimal_participants():
             },
         },
     )
-
-
-@pytest.fixture
-def mock_async_update_entry(hass, monkeypatch: MonkeyPatch):
-    """Mock hass.config_entries.async_update_entry for testing."""
-
-    def mock_update(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr(hass.config_entries, "async_update_entry", mock_update)
-    return mock_update
 
 
 @pytest.fixture
@@ -426,7 +414,6 @@ async def test_options_flow_configure_success(
     element_type,
     valid_case,
     config_entry_minimal_participants,
-    mock_async_update_entry,
     description,
 ) -> None:
     """Test successful configuration for all element types."""

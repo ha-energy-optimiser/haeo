@@ -14,7 +14,7 @@ from custom_components.haeo.const import (
     CONF_ELEMENT_TYPE,
     CONF_HORIZON_HOURS,
     CONF_PERIOD_MINUTES,
-    get_element_type_name,
+    ELEMENT_TYPE_TRANSLATION_KEYS,
 )
 
 if TYPE_CHECKING:
@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 class HubOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for HAEO hub."""
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_init(self, _user_input: dict[str, Any] | None = None) -> FlowResult:
         """Manage the options."""
         # user_input is not used in this step, just show the menu
         return self.async_show_menu(
@@ -84,7 +84,7 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
         # Show participant type selection
         participant_types = [
-            SelectOptionDict(value=element_type, label=get_element_type_name(element_type))
+            SelectOptionDict(value=element_type, label=ELEMENT_TYPE_TRANSLATION_KEYS[element_type])
             for element_type in ELEMENT_TYPES
         ]
 

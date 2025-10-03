@@ -19,7 +19,6 @@ from .const import (
     OPTIMIZATION_STATUS_PENDING,
     OPTIMIZATION_STATUS_SUCCESS,
     UNIT_CURRENCY,
-    get_element_type_name,
 )
 from .coordinator import HaeoDataUpdateCoordinator
 
@@ -28,12 +27,14 @@ _LOGGER = logging.getLogger(__name__)
 
 def get_device_info_for_element(element_name: str, element_type: str, config_entry: ConfigEntry) -> DeviceInfo:
     """Get device info for a specific element."""
-    device_name = get_element_type_name(element_type)
+    # Use translation key for the model name - Home Assistant will resolve this
+    model_translation_key = f"entity.device.{element_type}"
+
     return DeviceInfo(
         identifiers={(DOMAIN, f"{config_entry.entry_id}_{element_name}")},
-        name=f"{element_name}",
+        name=element_name,
         manufacturer="HAEO",
-        model=f"Energy Optimization {device_name}",
+        model=model_translation_key,
         via_device=(DOMAIN, config_entry.entry_id),
     )
 
@@ -42,9 +43,9 @@ def get_device_info_for_network(config_entry: ConfigEntry) -> DeviceInfo:
     """Get device info for the main hub."""
     return DeviceInfo(
         identifiers={(DOMAIN, config_entry.entry_id)},
-        name="HAEO Energy Optimization Network",
+        name="HAEO Network",
         manufacturer="HAEO",
-        model="Energy Optimization Network",
+        model="entity.device.network",
         sw_version="1.0.0",
     )
 
@@ -57,9 +58,9 @@ async def async_register_devices(hass: HomeAssistant, config_entry: ConfigEntry)
     device_registry_client.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, config_entry.entry_id)},
-        name="HAEO Energy Optimization Network",
+        name="HAEO Network",
         manufacturer="HAEO",
-        model="Energy Optimization Network",
+        model="entity.device.network",
         sw_version="1.0.0",
     )
 
@@ -68,13 +69,12 @@ async def async_register_devices(hass: HomeAssistant, config_entry: ConfigEntry)
     for element_name, element_config in participants.items():
         element_type = element_config.get("type", "")
 
-        device_name = get_element_type_name(element_type)
         device_registry_client.async_get_or_create(
             config_entry_id=config_entry.entry_id,
             identifiers={(DOMAIN, f"{config_entry.entry_id}_{element_name}")},
             name=element_name,
             manufacturer="HAEO",
-            model=f"Energy Optimization {device_name}",
+            model=f"entity.device.{element_type}",
             via_device=(DOMAIN, config_entry.entry_id),
         )
 
@@ -96,7 +96,7 @@ async def async_setup_entry(
     try:
         await async_register_devices(hass, config_entry)
     except Exception as ex:
-        _LOGGER.warning("Failed to register devices: %s", ex)
+        _LOGGER.warning("Failed to register devices", exc_info=ex)
 
     entities = _create_sensors(coordinator, config_entry)
 
@@ -123,15 +123,15 @@ def _create_sensors(
         # Determine which sensors to create for this element
         sensor_configs = _get_element_sensor_configs(coordinator, element_name)
 
-        for sensor_config in sensor_configs:
-            entities.append(
-                sensor_config["sensor_class"](
-                    coordinator,
-                    config_entry,
-                    element_name,
-                    element_type,
-                )
+        entities.extend(
+            sensor_config["sensor_class"](
+                coordinator,
+                config_entry,
+                element_name,
+                element_type,
             )
+            for sensor_config in sensor_configs
+        )
 
     return entities
 
@@ -186,8 +186,18 @@ class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity)
         self.sensor_type = sensor_type
         self.element_name = element_name
         self.element_type = element_type
-        self._attr_name = f"HAEO {name_suffix}"
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}"
+        self._attr_translation_key = element_type or sensor_type
+
+        # Set sensor name with HAEO prefix
+        if element_name:
+            # Check if name_suffix already contains the element name to avoid duplication
+            if element_name in name_suffix:
+                self._attr_name = f"HAEO {name_suffix}"
+            else:
+                self._attr_name = f"HAEO {element_name} {name_suffix}"
+        else:
+            self._attr_name = f"HAEO {name_suffix}"
 
         # Set device info based on whether this is a hub-level or entity-level sensor
         if element_name and element_type:
@@ -206,9 +216,10 @@ class HaeoSensorBase(CoordinatorEntity[HaeoDataUpdateCoordinator], SensorEntity)
         if self.element_name and self.element_type:
             try:
                 element_data = self.coordinator.get_element_data(self.element_name)
-                return element_data is not None
             except Exception:
                 return False
+
+            return element_data is not None
 
         # For hub-level sensors, check if coordinator has optimization results
         if self.sensor_type in ["optimization_cost", "optimization_status"]:
@@ -233,6 +244,7 @@ class HaeoOptimizationCostSensor(HaeoSensorBase):
         self._attr_device_class = SensorDeviceClass.MONETARY
         self._attr_native_unit_of_measurement = UNIT_CURRENCY
         self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_translation_key = "optimization_cost"
 
         # Set initial values from coordinator
         self._attr_native_value = self.coordinator.last_optimization_cost
@@ -263,6 +275,7 @@ class HaeoOptimizationStatusSensor(HaeoSensorBase):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, config_entry, "optimization_status", "Optimization Status")
+        self._attr_translation_key = "optimization_status"
 
     @property
     def native_value(self) -> str:
@@ -307,6 +320,7 @@ class HaeoElementPowerSensor(HaeoSensorBase):
             element_type,
         )
         self.element_name = element_name
+        self._attr_translation_key = "power"
         self._attr_device_class = SensorDeviceClass.POWER
         self._attr_native_unit_of_measurement = UnitOfPower.WATT
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -373,6 +387,7 @@ class HaeoElementEnergySensor(HaeoSensorBase):
         self._attr_device_class = SensorDeviceClass.ENERGY_STORAGE
         self._attr_native_unit_of_measurement = UnitOfEnergy.WATT_HOUR
         self._attr_state_class = SensorStateClass.TOTAL
+        self._attr_translation_key = "energy"
 
     @property
     def native_value(self) -> float | None:

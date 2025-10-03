@@ -134,8 +134,9 @@ def test_sensor_base_device_info(mock_coordinator, mock_config_entry):
 
     assert device_info is not None
     assert device_info.get("identifiers") == {(DOMAIN, mock_config_entry.entry_id)}
-    assert device_info.get("name") == "HAEO Energy Optimization Network"
+    assert device_info.get("name") == "HAEO Network"
     assert device_info.get("manufacturer") == "HAEO"
+    assert device_info.get("model") == "entity.device.network"
 
 
 def test_sensor_base_available_success(mock_coordinator, mock_config_entry):
@@ -170,7 +171,7 @@ def test_sensor_base_device_info_with_element(mock_coordinator, mock_config_entr
     assert device_info.get("identifiers") == {(DOMAIN, f"{mock_config_entry.entry_id}_test_battery")}
     assert device_info.get("name") == "test_battery"
     assert device_info.get("manufacturer") == "HAEO"
-    assert device_info.get("model") == "Energy Optimization Battery"
+    assert device_info.get("model") == "entity.device.battery"
 
 
 def test_optimization_cost_sensor_init(mock_coordinator, mock_config_entry):
@@ -357,7 +358,7 @@ def test_sensor_base_device_info_with_grid_element(mock_coordinator, mock_config
     assert device_info.get("identifiers") == {(DOMAIN, f"{mock_config_entry.entry_id}_test_grid")}
     assert device_info.get("name") == "test_grid"
     assert device_info.get("manufacturer") == "HAEO"
-    assert device_info.get("model") == "Energy Optimization Grid Connection"
+    assert device_info.get("model") == "entity.device.grid"
 
 
 def test_sensor_base_device_info_with_generator_element(mock_coordinator, mock_config_entry):
@@ -376,7 +377,7 @@ def test_sensor_base_device_info_with_generator_element(mock_coordinator, mock_c
     assert device_info.get("identifiers") == {(DOMAIN, f"{mock_config_entry.entry_id}_test_generator")}
     assert device_info.get("name") == "test_generator"
     assert device_info.get("manufacturer") == "HAEO"
-    assert device_info.get("model") == "Energy Optimization Generator"
+    assert device_info.get("model") == "entity.device.generator"
 
 
 # Coordinator update tests removed as they require complex Home Assistant context mocking
@@ -508,7 +509,7 @@ def test_battery_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_battery", ELEMENT_TYPE_BATTERY)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Battery"
+    assert device_info.get("model") == "entity.device.battery"
 
 
 def test_grid_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -516,7 +517,7 @@ def test_grid_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_grid", ELEMENT_TYPE_GRID)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Grid Connection"
+    assert device_info.get("model") == "entity.device.grid"
 
 
 def test_generator_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -524,7 +525,7 @@ def test_generator_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_generator", ELEMENT_TYPE_GENERATOR)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Generator"
+    assert device_info.get("model") == "entity.device.generator"
 
 
 def test_load_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -532,7 +533,7 @@ def test_load_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load", ELEMENT_TYPE_FORECAST_LOAD)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Forecast Load"
+    assert device_info.get("model") == "entity.device.forecast_load"
 
 
 def test_load_fixed_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -540,7 +541,7 @@ def test_load_fixed_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load_fixed", ELEMENT_TYPE_CONSTANT_LOAD)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Constant Load"
+    assert device_info.get("model") == "entity.device.constant_load"
 
 
 def test_load_forecast_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -553,7 +554,7 @@ def test_load_forecast_sensor_device_info(mock_coordinator, mock_config_entry):
     )
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Forecast Load"
+    assert device_info.get("model") == "entity.device.forecast_load"
 
 
 def test_net_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -561,7 +562,7 @@ def test_net_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_net", ELEMENT_TYPE_NET)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Network Node"
+    assert device_info.get("model") == "entity.device.net"
 
 
 def test_connection_sensor_device_info(mock_coordinator, mock_config_entry):
@@ -569,7 +570,7 @@ def test_connection_sensor_device_info(mock_coordinator, mock_config_entry):
     sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_connection", ELEMENT_TYPE_CONNECTION)
     device_info = sensor.device_info
 
-    assert device_info.get("model") == "Energy Optimization Connection"
+    assert device_info.get("model") == "entity.device.connection"
 
 
 def test_sensor_unavailable_when_sensor_data_missing(mock_config_entry):

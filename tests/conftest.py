@@ -1,6 +1,7 @@
 """Test configuration and fixtures."""
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.haeo.const import DOMAIN, ELEMENT_TYPE_BATTERY, ELEMENT_TYPE_GRID
 
@@ -17,8 +18,6 @@ def auto_enable_custom_integrations(enable_custom_integrations) -> bool:
 @pytest.fixture
 def mock_config_entry():
     """Create a mock config entry for testing."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
-
     return MockConfigEntry(
         title="Test HAEO",
         domain=DOMAIN,

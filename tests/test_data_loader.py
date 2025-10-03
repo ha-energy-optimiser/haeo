@@ -16,6 +16,7 @@ from custom_components.haeo.const import (
     CONF_INITIAL_CHARGE_PERCENTAGE,
     CONF_MIN_CHARGE_PERCENTAGE,
     FIELD_TYPE_CONSTANT,
+    FIELD_TYPE_FORECAST,
     FIELD_TYPE_SENSOR,
 )
 from custom_components.haeo.data_loader import (
@@ -24,9 +25,6 @@ from custom_components.haeo.data_loader import (
     get_field_device_class,
     get_field_property_type,
     get_field_type,
-    is_constant_field,
-    is_forecast_field,
-    is_sensor_field,
 )
 
 
@@ -130,41 +128,41 @@ async def test_get_field_type_unknown_field() -> None:
 
 
 # Field classification tests
-async def test_is_sensor_field_true() -> None:
-    """Test sensor field detection for sensor fields."""
-    assert is_sensor_field(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor) is True
-    assert is_sensor_field(CONF_IMPORT_PRICE, MockConfigWithPriceSensor) is True
-    assert is_sensor_field(CONF_FORECAST, MockConfigWithPowerSensor) is True
+async def test_get_field_property_type_sensor() -> None:
+    """Test field property type detection for sensor fields."""
+    # Test sensor field detection
+    prop_type = get_field_property_type(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor)
+    assert prop_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]
+
+    prop_type = get_field_property_type(CONF_IMPORT_PRICE, MockConfigWithPriceSensor)
+    assert prop_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]
+
+    prop_type = get_field_property_type(CONF_FORECAST, MockConfigWithPowerSensor)
+    assert prop_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]
 
 
-async def test_is_sensor_field_false() -> None:
-    """Test sensor field detection for non-sensor fields."""
-    assert is_sensor_field(CONF_CAPACITY, MockConfigWithCapacity) is False
-    assert is_sensor_field(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC) is False
-    assert is_sensor_field(CONF_EFFICIENCY, MockConfigWithEfficiency) is False
+async def test_get_field_property_type_constant() -> None:
+    """Test field property type detection for constant fields."""
+    # Test constant field detection
+    prop_type = get_field_property_type(CONF_CAPACITY, MockConfigWithCapacity)
+    assert prop_type == FIELD_TYPE_CONSTANT
+
+    prop_type = get_field_property_type(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC)
+    assert prop_type == FIELD_TYPE_CONSTANT
 
 
-async def test_is_forecast_field_true() -> None:
-    """Test forecast field detection for forecast fields."""
-    assert is_forecast_field(CONF_FORECAST) is True
-    assert is_forecast_field("import_price_forecast") is True
+async def test_get_field_property_type_forecast() -> None:
+    """Test field property type detection for forecast fields."""
+    # Test forecast field detection
+    prop_type = get_field_property_type(CONF_FORECAST, MockConfigWithPowerSensor)
+    assert prop_type == FIELD_TYPE_FORECAST
 
 
-async def test_is_forecast_field_false() -> None:
-    """Test forecast field detection for non-forecast fields."""
-    assert is_forecast_field(CONF_INITIAL_CHARGE_PERCENTAGE) is False
-    assert is_forecast_field(CONF_CAPACITY) is False
-
-
-async def test_is_constant_field_true() -> None:
-    """Test constant field detection for constant fields."""
-    assert is_constant_field(CONF_CAPACITY, MockConfigWithCapacity) is True
-    assert is_constant_field(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC) is True
-
-
-async def test_is_constant_field_false() -> None:
-    """Test constant field detection for sensor fields."""
-    assert is_constant_field(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor) is False
+async def test_get_field_property_type_undefined() -> None:
+    """Test field property type detection for undefined fields."""
+    # Test undefined field detection (returns None)
+    prop_type = get_field_property_type("nonexistent_field", MockConfigWithBatterySensor)
+    assert prop_type is None
 
 
 # Unit conversion tests

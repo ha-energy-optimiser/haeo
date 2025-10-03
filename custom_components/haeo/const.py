@@ -1,9 +1,5 @@
 """Constants for the Home Assistant Energy Optimization integration."""
 
-import json
-import logging
-from pathlib import Path
-
 # Integration domain
 DOMAIN = "haeo"
 
@@ -34,6 +30,17 @@ ELEMENT_TYPES = [
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_NET,
 ]
+# Translation key mapping for element types
+ELEMENT_TYPE_TRANSLATION_KEYS = {
+    ELEMENT_TYPE_BATTERY: "entity.device.battery",
+    ELEMENT_TYPE_GRID: "entity.device.grid",
+    ELEMENT_TYPE_CONSTANT_LOAD: "entity.device.constant_load",
+    ELEMENT_TYPE_FORECAST_LOAD: "entity.device.forecast_load",
+    ELEMENT_TYPE_GENERATOR: "entity.device.generator",
+    ELEMENT_TYPE_NET: "entity.device.net",
+    ELEMENT_TYPE_CONNECTION: "entity.device.connection",
+}
+
 
 # Battery configuration keys
 CONF_CAPACITY = "capacity"
@@ -108,52 +115,3 @@ FIELD_TYPE_CONSTANT = "constant"
 ATTR_ENERGY = "energy"
 ATTR_POWER = "power"
 ATTR_FORECAST = "forecast"
-
-
-def get_element_type_name(element_type: str) -> str:
-    """Get translated element type name."""
-    _logger = logging.getLogger(__name__)
-
-    # Map element types to translation keys
-    device_type_map = {
-        ELEMENT_TYPE_BATTERY: "entity.device.battery",
-        ELEMENT_TYPE_GRID: "entity.device.grid_connection",
-        ELEMENT_TYPE_CONSTANT_LOAD: "entity.device.constant_load",
-        ELEMENT_TYPE_FORECAST_LOAD: "entity.device.forecast_load",
-        ELEMENT_TYPE_GENERATOR: "entity.device.generator",
-        ELEMENT_TYPE_NET: "entity.device.network_node",
-        ELEMENT_TYPE_CONNECTION: "entity.device.connection",
-    }
-
-    try:
-        # Load translations from en.json file
-        translations_file = Path(__file__).parent / "translations" / "en.json"
-
-        with translations_file.open(encoding="utf-8") as f:
-            translations_data = json.load(f)
-
-        translation_key = device_type_map.get(element_type)
-
-        if not translation_key:
-            msg = f"Unknown element type: {element_type}"
-            raise ValueError(msg)
-
-        # Parse the translation key path (e.g., "entity.device.battery")
-        key_parts = translation_key.split(".")
-        value = translations_data
-        for part in key_parts:
-            if part not in value:
-                msg = f"Translation key not found: {translation_key}"
-                raise KeyError(msg)
-            value = value[part]
-
-        if not isinstance(value, str):
-            msg = f"Translation value is not a string for key: {translation_key}"
-            raise TypeError(msg)
-
-        return value
-
-    except (json.JSONDecodeError, FileNotFoundError, KeyError, TypeError, ValueError):
-        _logger.exception("Failed to get element type name for %s", element_type)
-        # Use a generic fallback for error cases
-        return "Device"

@@ -1001,7 +1001,43 @@ def test_solar_curtailment_negative_pricing() -> None:
         assert solar_production[i] < solar_forecast[i], f"Solar should be curtailed in period {i}"
 
 
-# Parameterized tests using common framework
+def _create_element_for_test(element_type: str, name: str, **kwargs: Any) -> Any:
+    """Create element for testing based on type."""
+    if element_type == ELEMENT_TYPE_BATTERY:
+        return Battery(name=name, period=SECONDS_PER_HOUR, n_periods=HOURS_PER_DAY, **kwargs)
+    if element_type == ELEMENT_TYPE_GRID:
+        return Grid(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
+    if element_type == ELEMENT_TYPE_CONSTANT_LOAD:
+        return ConstantLoad(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
+    if element_type == ELEMENT_TYPE_FORECAST_LOAD:
+        return ForecastLoad(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
+    if element_type == ELEMENT_TYPE_GENERATOR:
+        return Generator(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
+    if element_type == ELEMENT_TYPE_NET:
+        return Net(name=name, period=SECONDS_PER_HOUR, n_periods=3)
+    pytest.fail(f"Unknown element type: {element_type}")
+
+
+def _assert_element_basic_properties(element: Any, name: str) -> None:
+    """Assert basic properties for all elements."""
+    assert element.name == name
+    assert element.period == SECONDS_PER_HOUR
+
+
+def _assert_element_power_vars(element: Any, expected_vars: int) -> None:
+    """Assert power variable counts for elements."""
+    if element.power_consumption:
+        assert len(element.power_consumption) == expected_vars
+    if element.power_production:
+        assert len(element.power_production) == expected_vars
+
+
+def _assert_element_energy_vars(element: Any, expected_vars: int) -> None:
+    """Assert energy variable counts for elements."""
+    if element.energy:
+        assert len(element.energy) == expected_vars
+
+
 @pytest.mark.parametrize(
     "element_data",
     [
@@ -1068,43 +1104,6 @@ def test_solar_curtailment_negative_pricing() -> None:
         ),
     ],
 )
-def _create_element_for_test(element_type: str, name: str, **kwargs: Any) -> Any:
-    """Create element for testing based on type."""
-    if element_type == ELEMENT_TYPE_BATTERY:
-        return Battery(name=name, period=SECONDS_PER_HOUR, n_periods=HOURS_PER_DAY, **kwargs)
-    if element_type == ELEMENT_TYPE_GRID:
-        return Grid(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
-    if element_type == ELEMENT_TYPE_CONSTANT_LOAD:
-        return ConstantLoad(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
-    if element_type == ELEMENT_TYPE_FORECAST_LOAD:
-        return ForecastLoad(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
-    if element_type == ELEMENT_TYPE_GENERATOR:
-        return Generator(name=name, period=SECONDS_PER_HOUR, n_periods=3, **kwargs)
-    if element_type == ELEMENT_TYPE_NET:
-        return Net(name=name, period=SECONDS_PER_HOUR, n_periods=3)
-    pytest.fail(f"Unknown element type: {element_type}")
-
-
-def _assert_element_basic_properties(element: Any, name: str) -> None:
-    """Assert basic properties for all elements."""
-    assert element.name == name
-    assert element.period == SECONDS_PER_HOUR
-
-
-def _assert_element_power_vars(element: Any, expected_vars: int) -> None:
-    """Assert power variable counts for elements."""
-    if element.power_consumption:
-        assert len(element.power_consumption) == expected_vars
-    if element.power_production:
-        assert len(element.power_production) == expected_vars
-
-
-def _assert_element_energy_vars(element: Any, expected_vars: int) -> None:
-    """Assert energy variable counts for elements."""
-    if element.energy:
-        assert len(element.energy) == expected_vars
-
-
 def test_element_initialization(element_data) -> None:
     """Test element initialization using parameterized data."""
     element_type = element_data["type"]

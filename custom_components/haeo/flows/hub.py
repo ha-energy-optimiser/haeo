@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntry, ConfigFlow
 from homeassistant.const import CONF_NAME
 
 from custom_components.haeo.const import CONF_HORIZON_HOURS, CONF_PERIOD_MINUTES, DOMAIN
@@ -20,7 +20,7 @@ from . import get_network_timing_schema, validate_network_timing_input
 _LOGGER = logging.getLogger(__name__)
 
 
-class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class HubConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for HAEO hub creation."""
 
     VERSION = 1
@@ -72,6 +72,6 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     @staticmethod
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> HubOptionsFlow:
+    def async_get_options_flow(_config_entry: ConfigEntry) -> HubOptionsFlow:
         """Get the options flow for this handler."""
         return HubOptionsFlow()

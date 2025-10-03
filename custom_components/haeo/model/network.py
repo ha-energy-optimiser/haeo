@@ -132,7 +132,7 @@ class Network:
                     raise ValueError(msg)
                 if isinstance(self.elements[element.source], Connection):
                     msg = f"Source element '{element.source}' is a connection"
-                    raise ValueError(msg)
+                    raise ValueError(msg)  # noqa: TRY004 value error is appropriate here
                 if isinstance(self.elements[element.target], Connection):
                     msg = f"Target element '{element.target}' is a connection"
-                    raise ValueError(msg)
+                    raise ValueError(msg)  # noqa: TRY004 value error is appropriate here

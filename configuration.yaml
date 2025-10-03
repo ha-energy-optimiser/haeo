@@ -6,4 +6,4 @@ demo:
 logger:
   default: info
   logs:
-    homeassistant.loader: debug
+    custom_components.haeo: debug

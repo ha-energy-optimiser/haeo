@@ -82,7 +82,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return timestamps
 
-    async def _async_update_data(self) -> dict[str, Any]:
+    async def _async_update_data(self) -> dict[str, Any] | None:
         """Update data from Home Assistant entities and run optimization."""
         try:
             # Calculate time parameters from configuration
@@ -101,15 +101,11 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # Don't raise UpdateFailed here - let the sensors show as unavailable
                 return None
 
-            # Run optimization on the new network
-            if not self.network:
-                msg = "Network not initialized"
-                raise RuntimeError(msg)
-
             _LOGGER.debug("Running optimization for network with %d elements", len(self.network.elements))
 
             try:
-                cost = self.network.optimize()
+                # Run optimization in executor job to avoid blocking the event loop
+                cost = await self.hass.async_add_executor_job(self.network.optimize)
             except Exception:
                 _LOGGER.exception("Optimization failed")
                 raise
@@ -122,13 +118,13 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             _LOGGER.debug("Optimization completed successfully with cost: %s", cost)
 
-            return self.optimization_result
-
         except Exception as ex:
             self.optimization_status = OPTIMIZATION_STATUS_FAILED
             _LOGGER.exception("Failed to update HAEO data")
             error_message = "Error updating HAEO data"
             raise UpdateFailed(error_message) from ex
+
+        return self.optimization_result
 
     def get_element_data(self, element_name: str) -> dict[str, Any] | None:
         """Get data for a specific element directly from the network."""

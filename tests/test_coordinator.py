@@ -31,6 +31,7 @@ from custom_components.haeo.const import (
     OPTIMIZATION_STATUS_SUCCESS,
 )
 from custom_components.haeo.coordinator import HaeoDataUpdateCoordinator
+from custom_components.haeo.model import Network
 
 
 @pytest.fixture
@@ -129,8 +130,6 @@ def test_get_element_data(hass: HomeAssistant, mock_config_entry) -> None:
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     # Build a network with entities
-    from custom_components.haeo.model import Network
-
     coordinator.network = Network("test", period=3600, n_periods=3)
     coordinator.network.add(
         ELEMENT_TYPE_BATTERY,
@@ -171,8 +170,6 @@ def test_last_optimization_properties(hass: HomeAssistant, mock_config_entry) ->
     assert coordinator.last_optimization_time is None
 
     # Set optimization result
-    from datetime import datetime
-
     test_time = datetime.now()
     coordinator.optimization_result = {
         "cost": 150.0,
@@ -198,8 +195,6 @@ async def test_get_future_timestamps_with_result(hass: HomeAssistant, mock_confi
     coordinator = HaeoDataUpdateCoordinator(hass, mock_config_entry)
 
     # Create a network for the coordinator
-    from custom_components.haeo.model import Network
-
     coordinator.network = Network("test", period=300, n_periods=576)
 
     # Set optimization result with timestamp

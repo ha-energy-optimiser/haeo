@@ -6,7 +6,8 @@ from dataclasses import fields
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.sensor.const import DEVICE_CLASS_UNITS, UNIT_CONVERTERS, SensorDeviceClass
+from homeassistant.components.sensor.const import UNIT_CONVERTERS, SensorDeviceClass
+from homeassistant.const import UnitOfEnergy, UnitOfPower
 import numpy as np
 
 from .const import CONF_ELEMENT_TYPE, FIELD_TYPE_CONSTANT, FIELD_TYPE_FORECAST, FIELD_TYPE_SENSOR
@@ -15,7 +16,7 @@ from .types import ELEMENT_TYPES
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import HomeAssistant, State
 
     # Union type for field values that can be either configuration objects or actual values
     FieldValue = (
@@ -31,25 +32,18 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-# Unit conversion functions
 def convert_to_base_unit(value: float, from_unit: str | None, device_class: SensorDeviceClass) -> float:
-    """Convert a value to base unit using Home Assistant converters."""
-    if device_class in [SensorDeviceClass.MONETARY, SensorDeviceClass.BATTERY]:
-        # MONETARY and BATTERY don't need unit conversion (already in correct units)
-        return value
-    if device_class in UNIT_CONVERTERS:
-        converter = UNIT_CONVERTERS[device_class]
-        # Get the appropriate base unit for this device class
-        if device_class == SensorDeviceClass.POWER:
-            return converter.convert(value, from_unit, "W")
-        if device_class in [SensorDeviceClass.ENERGY, SensorDeviceClass.ENERGY_STORAGE]:
-            return converter.convert(value, from_unit, "Wh")
-        # Use the first valid unit as base
-        valid_units = DEVICE_CLASS_UNITS.get(device_class, set())
-        base_unit = next(iter(valid_units)) if valid_units else None
-        if base_unit:
-            return converter.convert(value, from_unit, base_unit)
-    # For types without converters, return as-is
+    """Convert a value to base unit used in optimization."""
+    base_units = {
+        SensorDeviceClass.POWER: UnitOfPower.WATT,
+        SensorDeviceClass.ENERGY: UnitOfEnergy.WATT_HOUR,
+        SensorDeviceClass.ENERGY_STORAGE: UnitOfEnergy.WATT_HOUR,
+    }
+
+    # Convert if required
+    if device_class in base_units:
+        return UNIT_CONVERTERS.get(device_class).convert(value, from_unit, base_units[device_class])
+
     return value
 
 
@@ -90,44 +84,13 @@ def get_field_device_class(field_name: str, config_class: type) -> SensorDeviceC
     return field_type[0]
 
 
-def get_field_property_type(field_name: str, config_class: type) -> str:
+def get_field_property_type(field_name: str, config_class: type) -> str | None:
     """Get the property type (constant, sensor, forecast) from field type tuple."""
-    field_type = get_field_type(field_name, config_class)
-    return field_type[1]
-
-
-def is_sensor_field(field_name: str, config_class: type) -> bool:
-    """Check if a field is sensor-based (not a constant)."""
     try:
-        property_type = get_field_property_type(field_name, config_class)
-        return property_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]
+        field_type = get_field_type(field_name, config_class)
+        return field_type[1]
     except ValueError:
-        # If field_type is not properly defined, assume it's not a sensor field
-        return False
-
-
-def is_forecast_field(field_name: str, config_class: type | None = None) -> bool:
-    """Check if a field represents forecast data."""
-    if config_class:
-        try:
-            property_type = get_field_property_type(field_name, config_class)
-            return property_type == FIELD_TYPE_FORECAST
-        except ValueError:
-            # If field_type is not properly defined, fall back to name-based detection
-            return "forecast" in field_name.lower()
-
-    # Fallback to name-based detection (for backward compatibility)
-    return "forecast" in field_name.lower()
-
-
-def is_constant_field(field_name: str, config_class: type) -> bool:
-    """Check if a field is a constant value (not sensor-based)."""
-    try:
-        property_type = get_field_property_type(field_name, config_class)
-        return property_type == FIELD_TYPE_CONSTANT
-    except ValueError:
-        # If field_type is not properly defined, assume it's not a constant field
-        return False
+        return None
 
 
 class DataLoader:
@@ -200,14 +163,15 @@ class DataLoader:
                 field_name = field_info.name
 
                 # Skip element_type and constant fields
-                if field_name == "element_type" or is_constant_field(field_name, config_class):
+                property_type = get_field_property_type(field_name, config_class)
+                if field_name == "element_type" or property_type == FIELD_TYPE_CONSTANT:
                     continue
 
                 # Get field value from configuration
                 field_value = element_config.get(field_name)
 
                 # Check if this is a sensor field that needs data
-                if is_sensor_field(field_name, config_class) and field_value:
+                if property_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST] and field_value:
                     if isinstance(field_value, str):
                         sensor_ids = [field_value]
                     elif isinstance(field_value, list) and field_value and isinstance(field_value[0], str):
@@ -316,7 +280,7 @@ class DataLoader:
         # Get field type information
         try:
             field_type = get_field_type(field_name, config_class)
-            device_class, property_type = field_type
+            _device_class, property_type = field_type
         except ValueError:
             # If field_type is not properly defined, return as-is
             return field_value
@@ -326,7 +290,7 @@ class DataLoader:
             return field_value
 
         if property_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]:
-            return await self._load_sensor_field_data(field_value, property_type, device_class, n_periods)
+            return await self._load_sensor_field_data(field_value, property_type, n_periods)
 
         return field_value
 
@@ -334,7 +298,6 @@ class DataLoader:
         self,
         field_value: FieldValue,
         property_type: str,
-        device_class: SensorDeviceClass | str,
         n_periods: int,
     ) -> FieldValue | None:
         """Load sensor or forecast field data."""
@@ -346,7 +309,7 @@ class DataLoader:
             return await self.load_sensor_forecast(sensor_ids, n_periods)
 
         # For single-value sensor fields, sum all sensor values
-        return await self._sum_sensor_values(sensor_ids, device_class)
+        return await self._sum_sensor_values(sensor_ids)
 
     def _extract_sensor_ids(self, field_value: FieldValue) -> list[str] | None:
         """Extract sensor IDs from field value."""
@@ -362,7 +325,7 @@ class DataLoader:
         # Single constant value or other type
         return None
 
-    async def _sum_sensor_values(self, sensor_ids: list[str], device_class: SensorDeviceClass | str) -> float | None:
+    async def _sum_sensor_values(self, sensor_ids: list[str]) -> float | None:
         """Sum values from multiple sensors."""
         total_value = None
         for sensor_id in sensor_ids:
@@ -374,7 +337,6 @@ class DataLoader:
     async def _load_current_sensor_values(
         self,
         sensor_ids: list[str],
-        device_class: str | SensorDeviceClass,
         n_periods: int,
     ) -> list[float] | None:
         """Load current values from sensors and repeat for all periods."""
@@ -415,10 +377,11 @@ class DataLoader:
             ]:
                 unit = state.attributes.get("unit_of_measurement")
                 value = convert_to_base_unit(value, unit, device_class)
-            return value
         except (ValueError, TypeError):
             _LOGGER.exception("Invalid numeric value in sensor %s", sensor_id)
             return None
+
+        return value
 
     async def load_sensor_forecast(
         self,
@@ -503,7 +466,7 @@ class DataLoader:
         resampled_values = np.interp(target_indices, source_indices, forecast)
         return resampled_values.tolist()
 
-    def _get_repeated_value(self, state: Any, sensor_id: str, n_periods: int) -> list[float] | None:
+    def _get_repeated_value(self, state: State, sensor_id: str, n_periods: int) -> list[float] | None:
         """Get repeated current state value for forecast periods."""
         try:
             current_value = float(state.state)

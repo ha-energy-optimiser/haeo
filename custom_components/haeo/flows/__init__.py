@@ -5,9 +5,8 @@ from __future__ import annotations
 import collections.abc
 from dataclasses import fields
 import logging
-from typing import Any, Literal, get_type_hints
+from typing import TYPE_CHECKING, Any, Literal, get_type_hints
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -29,6 +28,10 @@ from custom_components.haeo.const import (
     MAX_PERIOD_MINUTES,
 )
 from custom_components.haeo.types import ELEMENT_TYPES
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -106,7 +109,7 @@ def get_schema(element_type: str, **kwargs: Any) -> vol.Schema:
 
 
 def get_network_timing_schema(
-    config_entry: Any = None,
+    config_entry: ConfigEntry | None = None,
     *,
     include_name: bool = False,
     name_required: bool = True,

@@ -13,6 +13,7 @@ class Connection:
     def __init__(
         self,
         name: str,
+        period: int,  # noqa: ARG002 this is needed for consistency with other elements
         n_periods: int,
         *,
         source: str,
@@ -24,6 +25,7 @@ class Connection:
 
         Args:
             name: Name of the connection
+            period: Time period in seconds
             n_periods: Number of time periods
             source: Name of the source element
             target: Name of the target element
