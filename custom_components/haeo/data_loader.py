@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import fields
 import logging
 from typing import Any
-from dataclasses import fields
 
-from homeassistant.components.sensor.const import SensorDeviceClass, UNIT_CONVERTERS, DEVICE_CLASS_UNITS
-from homeassistant.core import HomeAssistant
+from homeassistant.components.sensor.const import DEVICE_CLASS_UNITS, UNIT_CONVERTERS, SensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 
-from .const import CONF_ELEMENT_TYPE
+from .const import CONF_ELEMENT_TYPE, FIELD_TYPE_CONSTANT, FIELD_TYPE_FORECAST, FIELD_TYPE_SENSOR
 from .model import Network
 from .types import ELEMENT_TYPES
 
@@ -23,19 +23,18 @@ def convert_to_base_unit(value: float, from_unit: str | None, device_class: Sens
     if device_class in [SensorDeviceClass.MONETARY, SensorDeviceClass.BATTERY]:
         # MONETARY and BATTERY don't need unit conversion (already in correct units)
         return value
-    elif device_class in UNIT_CONVERTERS:
+    if device_class in UNIT_CONVERTERS:
         converter = UNIT_CONVERTERS[device_class]
         # Get the appropriate base unit for this device class
         if device_class == SensorDeviceClass.POWER:
             return converter.convert(value, from_unit, "W")
-        elif device_class in [SensorDeviceClass.ENERGY, SensorDeviceClass.ENERGY_STORAGE]:
+        if device_class in [SensorDeviceClass.ENERGY, SensorDeviceClass.ENERGY_STORAGE]:
             return converter.convert(value, from_unit, "Wh")
-        else:
-            # Use the first valid unit as base
-            valid_units = DEVICE_CLASS_UNITS.get(device_class, set())
-            base_unit = next(iter(valid_units)) if valid_units else None
-            if base_unit:
-                return converter.convert(value, from_unit, base_unit)
+        # Use the first valid unit as base
+        valid_units = DEVICE_CLASS_UNITS.get(device_class, set())
+        base_unit = next(iter(valid_units)) if valid_units else None
+        if base_unit:
+            return converter.convert(value, from_unit, base_unit)
     # For types without converters, return as-is
     return value
 
@@ -53,6 +52,7 @@ def get_field_type(field_name: str, config_class: type) -> tuple[SensorDeviceCla
 
     Raises:
         ValueError: If field_type is not specified in metadata
+
     """
     for field_info in fields(config_class):
         if field_info.name == field_name:
@@ -60,7 +60,7 @@ def get_field_type(field_name: str, config_class: type) -> tuple[SensorDeviceCla
             field_type = field_info.metadata.get("field_type")
             if field_type is None:
                 raise ValueError(
-                    f"Field '{field_name}' in {config_class.__name__} must have 'field_type' specified in metadata"
+                    f"Field '{field_name}' in {config_class.__name__} must have 'field_type' specified in metadata",
                 )
 
             return field_type
@@ -80,32 +80,11 @@ def get_field_property_type(field_name: str, config_class: type) -> str:
     return field_type[1]
 
 
-def _get_device_class_from_schema(schema) -> SensorDeviceClass | None:
-    """Extract device class from schema configuration."""
-    # Handle EntitySelector with device_class
-    if hasattr(schema, "config"):
-        config = schema.config
-        if hasattr(config, "device_class"):
-            device_classes = config.device_class
-            if device_classes:
-                # If there's only one device class, return it
-                if len(device_classes) == 1:
-                    return device_classes[0]
-                # If there are multiple device classes, check if they're all price-related
-                elif (
-                    len(device_classes) == 2
-                    and SensorDeviceClass.MONETARY in device_classes
-                    and SensorDeviceClass.ENERGY in device_classes
-                ):
-                    return SensorDeviceClass.MONETARY  # Prefer MONETARY for price fields
-    return None
-
-
 def is_sensor_field(field_name: str, config_class: type) -> bool:
     """Check if a field is sensor-based (not a constant)."""
     try:
         property_type = get_field_property_type(field_name, config_class)
-        return property_type in ["sensor", "forecast"]
+        return property_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]
     except ValueError:
         # If field_type is not properly defined, assume it's not a sensor field
         return False
@@ -116,7 +95,7 @@ def is_forecast_field(field_name: str, config_class: type | None = None) -> bool
     if config_class:
         try:
             property_type = get_field_property_type(field_name, config_class)
-            return property_type == "forecast"
+            return property_type == FIELD_TYPE_FORECAST
         except ValueError:
             # If field_type is not properly defined, fall back to name-based detection
             return "forecast" in field_name.lower()
@@ -129,7 +108,7 @@ def is_constant_field(field_name: str, config_class: type) -> bool:
     """Check if a field is a constant value (not sensor-based)."""
     try:
         property_type = get_field_property_type(field_name, config_class)
-        return property_type == "constant"
+        return property_type == FIELD_TYPE_CONSTANT
     except ValueError:
         # If field_type is not properly defined, assume it's not a constant field
         return False
@@ -149,8 +128,8 @@ class DataLoader:
 
         Returns:
             A fully populated Network object with all elements and their data loaded
-        """
 
+        """
         # Create network with configured horizon and period
         network = Network(
             name=f"haeo_network_{config_entry.entry_id}",
@@ -185,8 +164,10 @@ class DataLoader:
 
         Returns:
             True if all required sensor data is available, False otherwise
+
         """
         from dataclasses import fields
+
         from .const import CONF_ELEMENT_TYPE
         from .types import ELEMENT_TYPES
 
@@ -242,7 +223,11 @@ class DataLoader:
         return True
 
     async def _load_element_data(
-        self, network: Network, element_name: str, element_config: dict[str, Any], n_periods: int
+        self,
+        network: Network,
+        element_name: str,
+        element_config: dict[str, Any],
+        n_periods: int,
     ) -> None:
         """Load data for a single element and add it to the network.
 
@@ -251,6 +236,7 @@ class DataLoader:
             element_name: Name of the element
             element_config: Configuration for the element
             n_periods: Number of time periods for the optimization
+
         """
         element_type = element_config.get(CONF_ELEMENT_TYPE)
         config_class = ELEMENT_TYPES.get(element_type)
@@ -276,18 +262,13 @@ class DataLoader:
             loaded_value = await self.load_field_data(field_name, field_value, config_class, n_periods)
 
             if loaded_value is not None:
-                # Apply transformations
-                transformed_result = await self._transform_field_value(
-                    element_type, field_name, loaded_value, element_config, n_periods
-                )
-
-                if transformed_result is not None:
-                    param_name = transformed_result["field_name"]
-                    param_value = transformed_result["field_value"]
-                    element_params[param_name] = param_value
+                element_params[field_name] = loaded_value
 
         _LOGGER.debug(
-            "Adding element: %s (%s) with params: %s", element_name, element_type, list(element_params.keys())
+            "Adding element: %s (%s) with params: %s",
+            element_name,
+            element_type,
+            list(element_params.keys()),
         )
 
         try:
@@ -296,44 +277,12 @@ class DataLoader:
             _LOGGER.error("Failed to add element %s: %s", element_name, ex)
             raise
 
-    async def _transform_field_value(
-        self, element_type: str, field_name: str, loaded_value: Any, element_config: dict[str, Any], n_periods: int
-    ) -> dict[str, Any] | None:
-        """Apply transformations to loaded field values based on field metadata.
-
-        Args:
-            element_type: Type of element being processed
-            field_name: Name of the field being processed
-            loaded_value: The loaded value from sensors/constants
-            element_config: Full configuration for the element
-            n_periods: Number of time periods
-
-        Returns:
-            Dictionary with field_name and field_value, or None if transformation fails
-        """
-        # Handle battery current charge sensor -> initial charge percentage conversion
-        if field_name == "current_charge":
-            capacity = element_config.get("capacity")
-            if capacity and loaded_value is not None:
-                # loaded_value should be a single value for current charge
-                charge_value = loaded_value[0] if isinstance(loaded_value, list) else loaded_value
-                if charge_value is not None:
-                    percentage = (charge_value / capacity) * 100
-                    return {"field_name": "initial_charge_percentage", "field_value": percentage}
-            _LOGGER.warning("Cannot convert battery charge to percentage without capacity or sensor value")
-            return None
-
-        # Handle load_forecast current power (negative for consumption)
-        elif field_name == "power" and element_type == "load_forecast":
-            if loaded_value is not None:
-                power_value = [-p for p in loaded_value] if isinstance(loaded_value, list) else [-loaded_value]
-                return {"field_name": field_name, "field_value": power_value}
-
-        # For all other fields, use the loaded value as-is with original field name
-        return {"field_name": field_name, "field_value": loaded_value}
-
     async def load_field_data(
-        self, field_name: str, field_value: Any, config_class: type, n_periods: int | None = None
+        self,
+        field_name: str,
+        field_value: Any,
+        config_class: type,
+        n_periods: int | None = None,
     ) -> Any:
         """Load field data based on its type and return populated data.
 
@@ -345,6 +294,7 @@ class DataLoader:
 
         Returns:
             The loaded field value (sensor data, forecast data, or constants as-is)
+
         """
         if n_periods is None:
             n_periods = 1
@@ -358,11 +308,11 @@ class DataLoader:
             return field_value
 
         # Handle constant fields
-        if property_type == "constant":
+        if property_type == FIELD_TYPE_CONSTANT:
             return field_value
 
         # Handle sensor and forecast fields
-        if property_type in ["sensor", "forecast"]:
+        if property_type in [FIELD_TYPE_SENSOR, FIELD_TYPE_FORECAST]:
             if isinstance(field_value, list):
                 # Check if it's a list of sensor IDs (strings) or constant values (numbers)
                 if field_value and isinstance(field_value[0], str):
@@ -376,22 +326,24 @@ class DataLoader:
                 # Single constant value
                 return field_value
 
-            if property_type == "forecast":
+            if property_type == FIELD_TYPE_FORECAST:
                 # Load forecast data directly
                 return await self.load_sensor_forecast(sensor_ids, device_class, n_periods)
-            else:
-                # For sensor fields, try forecast first, then fall back to current values
-                forecast_data = await self.load_sensor_forecast(sensor_ids, device_class, n_periods)
-                if forecast_data:
-                    return forecast_data
-
-                # Fall back to current sensor values
-                return await self._load_current_sensor_values(sensor_ids, device_class, n_periods)
+            # For single-value sensor fields, sum all sensor values
+            total_value = None
+            for sensor_id in sensor_ids:
+                sensor_value = await self.load_sensor_value(sensor_id, device_class)
+                if sensor_value is not None:
+                    total_value = total_value + sensor_value if total_value is not None else sensor_value
+            return total_value
 
         return field_value
 
     async def _load_current_sensor_values(
-        self, sensor_ids: list[str], device_class: str | SensorDeviceClass, n_periods: int
+        self,
+        sensor_ids: list[str],
+        device_class: str | SensorDeviceClass,
+        n_periods: int,
     ) -> list[float] | None:
         """Load current values from sensors and repeat for all periods."""
         total_value = None
@@ -405,12 +357,13 @@ class DataLoader:
         if total_value is not None:
             if n_periods == 1:
                 return [total_value]  # Return as single-element list for consistency
-            else:
-                return [total_value] * n_periods
+            return [total_value] * n_periods
         return None
 
     async def load_sensor_value(
-        self, sensor_id: str, field_type: str | SensorDeviceClass | None = None
+        self,
+        sensor_id: str,
+        field_type: str | SensorDeviceClass | None = None,
     ) -> float | None:
         """Load current value from a sensor and convert to base units."""
         state = self.hass.states.get(sensor_id)
@@ -437,7 +390,10 @@ class DataLoader:
             return None
 
     async def load_sensor_forecast(
-        self, sensor_ids: str | list[str], device_class: SensorDeviceClass | str, n_periods: int
+        self,
+        sensor_ids: str | list[str],
+        device_class: SensorDeviceClass | str,
+        n_periods: int,
     ) -> list[float] | None:
         """Load forecast data from sensor(s) and combine them."""
         if isinstance(sensor_ids, str):
@@ -475,7 +431,10 @@ class DataLoader:
                         sensor_forecast = [convert_to_base_unit(x, unit, sensor_device_class) for x in sensor_forecast]
                     # Resample to desired number of periods if needed
                     _LOGGER.debug(
-                        "Forecast data for %s: %d values, target: %d", sensor_id, len(sensor_forecast), n_periods
+                        "Forecast data for %s: %d values, target: %d",
+                        sensor_id,
+                        len(sensor_forecast),
+                        n_periods,
                     )
                     if len(sensor_forecast) != n_periods:
                         sensor_forecast = self._resample_forecast(sensor_forecast, n_periods)
@@ -493,7 +452,7 @@ class DataLoader:
                     combined_forecast = sensor_forecast
                 else:
                     # Sum the forecasts element-wise
-                    combined_forecast = [a + b for a, b in zip(combined_forecast, sensor_forecast)]
+                    combined_forecast = [a + b for a, b in zip(combined_forecast, sensor_forecast, strict=False)]
 
         return combined_forecast
 
@@ -503,9 +462,9 @@ class DataLoader:
 
         if len(forecast) == target_periods:
             return forecast
-        elif len(forecast) == 0:
+        if len(forecast) == 0:
             return [0.0] * target_periods
-        elif len(forecast) == 1:
+        if len(forecast) == 1:
             # Single value, repeat for all periods
             return [forecast[0]] * target_periods
 

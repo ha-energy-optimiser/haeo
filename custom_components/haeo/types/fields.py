@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
+from dataclasses import field
 
 from homeassistant.components.sensor.const import SensorDeviceClass
+from homeassistant.const import UnitOfPower
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -12,7 +14,6 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
 )
-from dataclasses import field
 import voluptuous as vol
 
 
@@ -43,7 +44,12 @@ def power_field(description: str, optional: bool = False, default: float = None)
                 vol.Coerce(float),
                 vol.Range(min=0, min_included=True, msg="Value must be positive"),
                 NumberSelector(
-                    NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="W")
+                    NumberSelectorConfig(
+                        mode=NumberSelectorMode.BOX,
+                        min=1,
+                        step=1,
+                        unit_of_measurement=UnitOfPower.WATT,
+                    ),
                 ),
             ),
             "optional": optional,
@@ -73,7 +79,7 @@ def power_forecast_field(description: str, optional: bool = False) -> Sequence[s
             "description": description,
             "field_type": (SensorDeviceClass.POWER, "forecast"),
             "schema": EntitySelector(
-                EntitySelectorConfig(domain="sensor", multiple=True, device_class=[SensorDeviceClass.POWER])
+                EntitySelectorConfig(domain="sensor", multiple=True, device_class=[SensorDeviceClass.POWER]),
             ),
             "optional": optional,
         },
@@ -89,7 +95,9 @@ def power_flow_field(description: str, optional: bool = False, default: float = 
             "field_type": (SensorDeviceClass.POWER, "constant"),
             "schema": vol.All(
                 vol.Coerce(float),
-                NumberSelector(NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement="W")),
+                NumberSelector(
+                    NumberSelectorConfig(mode=NumberSelectorMode.BOX, step=1, unit_of_measurement=UnitOfPower.WATT),
+                ),
             ),
             "optional": optional,
         },
@@ -107,7 +115,7 @@ def energy_field(description: str, optional: bool = False, default: float = None
                 vol.Coerce(float),
                 vol.Range(min=0, min_included=True, msg="Value must be positive"),
                 NumberSelector(
-                    NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="Wh")
+                    NumberSelectorConfig(mode=NumberSelectorMode.BOX, min=1, step=1, unit_of_measurement="Wh"),
                 ),
             ),
             "optional": optional,
@@ -127,7 +135,7 @@ def energy_sensors_field(description: str, optional: bool = False) -> Sequence[s
                     domain="sensor",
                     multiple=True,
                     device_class=[SensorDeviceClass.BATTERY, SensorDeviceClass.ENERGY_STORAGE],
-                )
+                ),
             ),
             "optional": optional,
         },
@@ -142,7 +150,7 @@ def energy_forecast_field(description: str, optional: bool = False) -> Sequence[
             "description": description,
             "field_type": (SensorDeviceClass.ENERGY, "forecast"),
             "schema": EntitySelector(
-                EntitySelectorConfig(domain="sensor", multiple=True, device_class=[SensorDeviceClass.ENERGY])
+                EntitySelectorConfig(domain="sensor", multiple=True, device_class=[SensorDeviceClass.ENERGY]),
             ),
             "optional": optional,
         },
@@ -174,8 +182,10 @@ def price_sensors_field(description: str, optional: bool = False) -> Sequence[st
             "field_type": (SensorDeviceClass.MONETARY, "sensor"),
             "schema": EntitySelector(
                 EntitySelectorConfig(
-                    domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]
-                )
+                    domain="sensor",
+                    multiple=True,
+                    device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY],
+                ),
             ),
             "optional": optional,
         },
@@ -191,8 +201,10 @@ def price_forecast_field(description: str, optional: bool = False) -> Sequence[s
             "field_type": (SensorDeviceClass.MONETARY, "forecast"),
             "schema": EntitySelector(
                 EntitySelectorConfig(
-                    domain="sensor", multiple=True, device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY]
-                )
+                    domain="sensor",
+                    multiple=True,
+                    device_class=[SensorDeviceClass.MONETARY, SensorDeviceClass.ENERGY],
+                ),
             ),
             "optional": optional,
         },

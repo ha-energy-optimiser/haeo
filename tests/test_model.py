@@ -5,19 +5,19 @@ import pytest
 from custom_components.haeo.const import (
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_CONNECTION,
-    ELEMENT_TYPE_GRID,
+    ELEMENT_TYPE_CONSTANT_LOAD,
+    ELEMENT_TYPE_FORECAST_LOAD,
     ELEMENT_TYPE_GENERATOR,
-    ELEMENT_TYPE_LOAD_FORECAST,
-    ELEMENT_TYPE_LOAD_CONSTANT,
+    ELEMENT_TYPE_GRID,
     ELEMENT_TYPE_NET,
 )
 from custom_components.haeo.model import Network
 from custom_components.haeo.model.battery import Battery
 from custom_components.haeo.model.connection import Connection
-from custom_components.haeo.model.grid import Grid
-from custom_components.haeo.model.load_constant import LoadConstant
-from custom_components.haeo.model.load_forecast import LoadForecast
+from custom_components.haeo.model.constant_load import ConstantLoad
+from custom_components.haeo.model.forecast_load import ForecastLoad
 from custom_components.haeo.model.generator import Generator
+from custom_components.haeo.model.grid import Grid
 from custom_components.haeo.model.net import Net
 
 
@@ -210,29 +210,27 @@ def test_load_forecast_initialization():
     """Test forecast load initialization."""
     forecast = [1000, 1500, 2000]
 
-    load = LoadForecast(
+    load = ForecastLoad(
         name="test_load",
         period=3600,
         n_periods=3,
-        current_power=500,
         forecast=forecast,
     )
 
     assert load.name == "test_load"
     assert load.period == 3600
     assert load.n_periods == 3
-    assert load.power_consumption == [500, 1000, 1500]  # current_power + forecast[:-1]
+    assert load.power_consumption == [1000, 1500, 2000]  # forecast
     assert load.power_production is None
 
 
 def test_load_forecast_invalid_forecast_length():
     """Test forecast load with invalid forecast length."""
     with pytest.raises(ValueError, match="forecast length"):
-        LoadForecast(
+        ForecastLoad(
             name="test_load",
             period=3600,
             n_periods=3,
-            current_power=500,
             forecast=[1000, 1500],  # Wrong length
         )
 
@@ -240,18 +238,17 @@ def test_load_forecast_invalid_forecast_length():
 def test_load_forecast_empty_forecast():
     """Test forecast load with empty forecast."""
     with pytest.raises(ValueError, match="forecast length"):
-        LoadForecast(
+        ForecastLoad(
             name="test_load",
             period=3600,
             n_periods=3,
-            current_power=500,
             forecast=[],  # Empty forecast
         )
 
 
 def test_load_constant_initialization():
     """Test constant load initialization."""
-    load = LoadConstant(
+    load = ConstantLoad(
         name="test_load",
         period=3600,
         n_periods=3,
@@ -268,7 +265,7 @@ def test_load_constant_initialization():
 def test_load_constant_negative_power():
     """Test constant load with negative power."""
     # LoadConstant doesn't validate inputs in constructor, just uses them to create power_consumption
-    load = LoadConstant(
+    load = ConstantLoad(
         name="test_load",
         period=3600,
         n_periods=3,
@@ -442,13 +439,12 @@ def test_add_load():
     )
 
     load = network.add(
-        ELEMENT_TYPE_LOAD_FORECAST,
+        ELEMENT_TYPE_FORECAST_LOAD,
         "test_load",
-        current_power=500,
         forecast=[1000, 1500, 2000],
     )
 
-    assert isinstance(load, LoadForecast)
+    assert isinstance(load, ForecastLoad)
     assert load.name == "test_load"
     assert "test_load" in network.elements
 
@@ -774,7 +770,7 @@ def test_simple_optimization():
         import_price=[0.1, 0.2, 0.15],
         export_price=[0.05, 0.08, 0.06],
     )
-    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", current_power=500, forecast=[1000, 1500, 2000])
+    network.add(ELEMENT_TYPE_FORECAST_LOAD, "load", forecast=[1000, 1500, 2000])
     network.add(ELEMENT_TYPE_NET, "net")
 
     # Connect them: grid -> net <- load
@@ -811,10 +807,14 @@ def test_battery_solar_grid_storage_cycle():
 
     # Add entities
     network.add(
-        ELEMENT_TYPE_GENERATOR, "solar", forecast=solar_forecast, curtailment=True, price_production=[0] * 8
+        ELEMENT_TYPE_GENERATOR,
+        "solar",
+        forecast=solar_forecast,
+        curtailment=True,
+        price_production=[0] * 8,
     )  # Solar has no fuel cost
 
-    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", current_power=500, forecast=load_forecast)
+    network.add(ELEMENT_TYPE_FORECAST_LOAD, "load", forecast=load_forecast)
 
     network.add(
         ELEMENT_TYPE_BATTERY,
@@ -909,7 +909,7 @@ def test_solar_curtailment_negative_pricing():
         price_production=[0] * 6,
     )  # No fuel cost for solar
 
-    network.add(ELEMENT_TYPE_LOAD_FORECAST, "load", current_power=500, forecast=load_forecast)
+    network.add(ELEMENT_TYPE_FORECAST_LOAD, "load", forecast=load_forecast)
 
     network.add(
         ELEMENT_TYPE_GRID,
@@ -1005,7 +1005,7 @@ def test_solar_curtailment_negative_pricing():
         ),
         pytest.param(
             {
-                "type": ELEMENT_TYPE_LOAD_CONSTANT,
+                "type": ELEMENT_TYPE_CONSTANT_LOAD,
                 "name": "test_load_constant",
                 "power": 1500,
                 "expected_power_vars": 3,
@@ -1014,9 +1014,8 @@ def test_solar_curtailment_negative_pricing():
         ),
         pytest.param(
             {
-                "type": ELEMENT_TYPE_LOAD_FORECAST,
+                "type": ELEMENT_TYPE_FORECAST_LOAD,
                 "name": "test_load_forecast",
-                "current_power": 500,
                 "forecast": [1000, 1500, 2000],
                 "expected_power_vars": 3,
             },
@@ -1057,10 +1056,10 @@ def test_element_initialization(element_data):
         element = Battery(name=name, period=3600, n_periods=24, **kwargs)
     elif element_type == ELEMENT_TYPE_GRID:
         element = Grid(name=name, period=3600, n_periods=3, **kwargs)
-    elif element_type == ELEMENT_TYPE_LOAD_CONSTANT:
-        element = LoadConstant(name=name, period=3600, n_periods=3, **kwargs)
-    elif element_type == ELEMENT_TYPE_LOAD_FORECAST:
-        element = LoadForecast(name=name, period=3600, n_periods=3, **kwargs)
+    elif element_type == ELEMENT_TYPE_CONSTANT_LOAD:
+        element = ConstantLoad(name=name, period=3600, n_periods=3, **kwargs)
+    elif element_type == ELEMENT_TYPE_FORECAST_LOAD:
+        element = ForecastLoad(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_GENERATOR:
         element = Generator(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_NET:
@@ -1111,7 +1110,7 @@ def test_element_initialization(element_data):
         ),
         pytest.param(
             {
-                "type": ELEMENT_TYPE_LOAD_CONSTANT,
+                "type": ELEMENT_TYPE_CONSTANT_LOAD,
                 "name": "test_load_constant",
                 "power": 1500,
             },
@@ -1119,9 +1118,8 @@ def test_element_initialization(element_data):
         ),
         pytest.param(
             {
-                "type": ELEMENT_TYPE_LOAD_FORECAST,
+                "type": ELEMENT_TYPE_FORECAST_LOAD,
                 "name": "test_load_forecast",
-                "current_power": 500,
                 "forecast": [1000, 1500, 2000],
             },
             id="load_forecast",
@@ -1159,10 +1157,10 @@ def test_element_constraints(element_data):
         element = Battery(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_GRID:
         element = Grid(name=name, period=3600, n_periods=3, **kwargs)
-    elif element_type == ELEMENT_TYPE_LOAD_CONSTANT:
-        element = LoadConstant(name=name, period=3600, n_periods=3, **kwargs)
-    elif element_type == ELEMENT_TYPE_LOAD_FORECAST:
-        element = LoadForecast(name=name, period=3600, n_periods=3, **kwargs)
+    elif element_type == ELEMENT_TYPE_CONSTANT_LOAD:
+        element = ConstantLoad(name=name, period=3600, n_periods=3, **kwargs)
+    elif element_type == ELEMENT_TYPE_FORECAST_LOAD:
+        element = ForecastLoad(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_GENERATOR:
         element = Generator(name=name, period=3600, n_periods=3, **kwargs)
     elif element_type == ELEMENT_TYPE_NET:

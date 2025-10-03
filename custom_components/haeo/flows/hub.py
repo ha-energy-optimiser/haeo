@@ -5,12 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 
-from ..const import DOMAIN
-from . import validate_element_name
+from ..const import CONF_HORIZON_HOURS, CONF_PERIOD_MINUTES, DOMAIN
+from . import get_network_timing_schema, validate_network_timing_input
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,48 +20,49 @@ class HubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 1
 
-    def _check_existing_names(self, name: str) -> bool:
-        """Check if integration name already exists."""
-        for entry in self.hass.config_entries.async_entries(DOMAIN):
-            if entry.title == name:
-                return True
-        return False
-
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Handle the initial step for hub creation."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            hub_name = user_input[CONF_NAME]
+            # Validate input using shared function
+            errors, validated_data = validate_network_timing_input(
+                user_input,
+                hass=self.hass,
+                include_name=True,
+                name_required=True,
+            )
 
-            # Check for duplicate names
-            if self._check_existing_names(hub_name):
-                errors[CONF_NAME] = "name_exists"
-            else:
-                # Create hub entry
-                await self.async_set_unique_id(f"haeo_hub_{hub_name.lower().replace(' ', '_')}")
-                self._abort_if_unique_id_configured()
-
-                return self.async_create_entry(
-                    title=hub_name,
-                    data={
-                        "integration_type": "hub",
-                        CONF_NAME: hub_name,
-                        "participants": {},
-                    },
+            if errors:
+                data_schema = get_network_timing_schema(include_name=True, name_required=True)
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=data_schema,
+                    errors=errors,
                 )
 
-        # Show form
-        data_schema = vol.Schema({
-            vol.Required(CONF_NAME): vol.All(str, validate_element_name),
-            vol.Optional(CONF_HORIZON, default=DEFAULT_HORIZON): vol.All(int, vol.Range(min=1, max=168, msg="Horizon must be between 1 and 168 hours")),
-            vol.Optional(CONF_PERIOD, default=DEFAULT_PERIOD_MINUTES): vol.All(int, vol.Range(min=1, max=60, msg="Period must be between 1 and 60 minutes")),
-        })
+            hub_name = validated_data["name"]
+
+            # Create the hub entry
+            await self.async_set_unique_id(f"haeo_hub_{hub_name.lower().replace(' ', '_')}")
+            self._abort_if_unique_id_configured()
+
+            # Create the hub entry
+            return self.async_create_entry(
+                title=hub_name,
+                data={
+                    "integration_type": "hub",
+                    CONF_NAME: hub_name,
+                    CONF_HORIZON_HOURS: validated_data[CONF_HORIZON_HOURS],
+                    CONF_PERIOD_MINUTES: validated_data[CONF_PERIOD_MINUTES],
+                    "participants": {},
+                },
+            )
+
+        # Show form with network timing configuration
+        data_schema = get_network_timing_schema(include_name=True, name_required=True)
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
-            errors=errors,
         )
 
     @staticmethod

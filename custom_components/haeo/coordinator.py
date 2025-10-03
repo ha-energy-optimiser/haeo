@@ -15,14 +15,14 @@ from .const import (
     ATTR_POWER,
     CONF_HORIZON_HOURS,
     CONF_PERIOD_MINUTES,
-    DOMAIN,
     DEFAULT_UPDATE_INTERVAL,
-    OPTIMIZATION_STATUS_SUCCESS,
+    DOMAIN,
     OPTIMIZATION_STATUS_FAILED,
     OPTIMIZATION_STATUS_PENDING,
+    OPTIMIZATION_STATUS_SUCCESS,
 )
-from .model import Network
 from .data_loader import DataLoader
+from .model import Network
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ def _calculate_time_parameters(horizon_hours: int, period_minutes: int) -> tuple
 
     Returns:
         Tuple of (period_seconds, n_periods)
+
     """
     period_seconds = period_minutes * 60  # Convert minutes to seconds
     horizon_seconds = horizon_hours * 3600  # Convert hours to seconds
@@ -154,7 +155,7 @@ class HaeoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else [0.0] * len(consumption)
             )
             # Net power = production - consumption (positive = net production, negative = net consumption)
-            element_data[ATTR_POWER] = [p - c for p, c in zip(production, consumption)]
+            element_data[ATTR_POWER] = [p - c for p, c in zip(production, consumption, strict=False)]
 
         if hasattr(element, "energy") and element.energy is not None:
             element_data["energy"] = extract_values(element.energy)

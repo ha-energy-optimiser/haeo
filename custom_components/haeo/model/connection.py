@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
-from pulp import LpVariable, LpConstraint
+
+from pulp import LpConstraint, LpVariable
 
 
 @dataclass

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Literal, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal
 
-from .fields import power_forecast_field, name_field, price_field, boolean_field
+from .fields import boolean_field, name_field, power_forecast_field, price_field
 
 
 @dataclass

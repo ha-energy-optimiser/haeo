@@ -1,37 +1,37 @@
 """Test the HAEO sensor platform."""
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
-import pytest
-from datetime import datetime, timezone
 
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.haeo.const import (
+    ATTR_ENERGY,
+    ATTR_POWER,
     CONF_ELEMENT_TYPE,
     DOMAIN,
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_CONNECTION,
+    ELEMENT_TYPE_CONSTANT_LOAD,
+    ELEMENT_TYPE_FORECAST_LOAD,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_CONSTANT,
-    ELEMENT_TYPE_LOAD_FORECAST,
     ELEMENT_TYPE_NET,
-    OPTIMIZATION_STATUS_SUCCESS,
     OPTIMIZATION_STATUS_FAILED,
+    OPTIMIZATION_STATUS_SUCCESS,
     UNIT_CURRENCY,
-    ATTR_POWER,
-    ATTR_ENERGY,
-)
-from custom_components.haeo.sensor import (
-    async_setup_entry,
-    HaeoSensorBase,
-    HaeoOptimizationCostSensor,
-    HaeoOptimizationStatusSensor,
-    HaeoElementPowerSensor,
-    HaeoElementEnergySensor,
 )
 from custom_components.haeo.coordinator import HaeoDataUpdateCoordinator
+from custom_components.haeo.sensor import (
+    HaeoElementEnergySensor,
+    HaeoElementPowerSensor,
+    HaeoOptimizationCostSensor,
+    HaeoOptimizationStatusSensor,
+    HaeoSensorBase,
+    async_setup_entry,
+)
 
 
 @pytest.fixture
@@ -41,21 +41,21 @@ def mock_coordinator():
     coordinator.last_update_success = True
     coordinator.optimization_status = OPTIMIZATION_STATUS_SUCCESS
     coordinator.last_optimization_cost = 15.50
-    coordinator.last_optimization_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    coordinator.last_optimization_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
     coordinator.optimization_result = {
         "solution": {
             "test_battery_power": [50.0, 75.0, 100.0],  # Battery transporting power
             "test_battery_energy": [500.0, 600.0, 700.0],
-        }
+        },
     }
     coordinator.get_element_data.return_value = {
         ATTR_POWER: [-50.0, -75.0, -100.0],  # Net power (negative = consuming)
         ATTR_ENERGY: [500.0, 600.0, 700.0],
     }
     coordinator.get_future_timestamps.return_value = [
-        datetime(2024, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
-        datetime(2024, 1, 1, 14, 0, 0, tzinfo=timezone.utc),
-        datetime(2024, 1, 1, 15, 0, 0, tzinfo=timezone.utc),
+        datetime(2024, 1, 1, 13, 0, 0, tzinfo=UTC),
+        datetime(2024, 1, 1, 14, 0, 0, tzinfo=UTC),
+        datetime(2024, 1, 1, 15, 0, 0, tzinfo=UTC),
     ]
     return coordinator
 
@@ -71,8 +71,8 @@ def mock_config_entry():
             "participants": {
                 "test_battery": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_BATTERY},
                 "test_grid": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_GRID},
-                "test_load_fixed": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_LOAD_CONSTANT},
-                "test_load_forecast": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_LOAD_FORECAST},
+                "test_load_fixed": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONSTANT_LOAD},
+                "test_load_forecast": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_FORECAST_LOAD},
                 "test_connection": {CONF_ELEMENT_TYPE: ELEMENT_TYPE_CONNECTION},
             },
         },
@@ -157,7 +157,12 @@ def test_sensor_base_available_failure(mock_coordinator, mock_config_entry):
 def test_sensor_base_device_info_with_element(mock_coordinator, mock_config_entry):
     """Test device info property with element info."""
     sensor = HaeoSensorBase(
-        mock_coordinator, mock_config_entry, "test_type", "Test Sensor", "test_battery", ELEMENT_TYPE_BATTERY
+        mock_coordinator,
+        mock_config_entry,
+        "test_type",
+        "Test Sensor",
+        "test_battery",
+        ELEMENT_TYPE_BATTERY,
     )
     device_info = sensor.device_info
 
@@ -339,7 +344,12 @@ def test_element_energy_sensor_extra_state_attributes(mock_coordinator, mock_con
 def test_sensor_base_device_info_with_element(mock_coordinator, mock_config_entry):
     """Test device info property with element info."""
     sensor = HaeoSensorBase(
-        mock_coordinator, mock_config_entry, "test_type", "Test Sensor", "test_battery", ELEMENT_TYPE_BATTERY
+        mock_coordinator,
+        mock_config_entry,
+        "test_type",
+        "Test Sensor",
+        "test_battery",
+        ELEMENT_TYPE_BATTERY,
     )
     device_info = sensor.device_info
 
@@ -353,7 +363,12 @@ def test_sensor_base_device_info_with_element(mock_coordinator, mock_config_entr
 def test_sensor_base_device_info_with_grid_element(mock_coordinator, mock_config_entry):
     """Test device info property with grid element info."""
     sensor = HaeoSensorBase(
-        mock_coordinator, mock_config_entry, "test_type", "Test Sensor", "test_grid", ELEMENT_TYPE_GRID
+        mock_coordinator,
+        mock_config_entry,
+        "test_type",
+        "Test Sensor",
+        "test_grid",
+        ELEMENT_TYPE_GRID,
     )
     device_info = sensor.device_info
 
@@ -367,7 +382,12 @@ def test_sensor_base_device_info_with_grid_element(mock_coordinator, mock_config
 def test_sensor_base_device_info_with_generator_element(mock_coordinator, mock_config_entry):
     """Test device info property with generator element info."""
     sensor = HaeoSensorBase(
-        mock_coordinator, mock_config_entry, "test_type", "Test Sensor", "test_generator", ELEMENT_TYPE_GENERATOR
+        mock_coordinator,
+        mock_config_entry,
+        "test_type",
+        "Test Sensor",
+        "test_generator",
+        ELEMENT_TYPE_GENERATOR,
     )
     device_info = sensor.device_info
 
@@ -528,7 +548,7 @@ def test_generator_sensor_device_info(mock_coordinator, mock_config_entry):
 
 def test_load_sensor_device_info(mock_coordinator, mock_config_entry):
     """Test device info for load sensor."""
-    sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load", ELEMENT_TYPE_LOAD_FORECAST)
+    sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load", ELEMENT_TYPE_FORECAST_LOAD)
     device_info = sensor.device_info
 
     assert device_info.get("model") == "Energy Optimization Forecast Load"
@@ -536,7 +556,7 @@ def test_load_sensor_device_info(mock_coordinator, mock_config_entry):
 
 def test_load_fixed_sensor_device_info(mock_coordinator, mock_config_entry):
     """Test device info for fixed load sensor."""
-    sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load_fixed", ELEMENT_TYPE_LOAD_CONSTANT)
+    sensor = HaeoElementPowerSensor(mock_coordinator, mock_config_entry, "test_load_fixed", ELEMENT_TYPE_CONSTANT_LOAD)
     device_info = sensor.device_info
 
     assert device_info.get("model") == "Energy Optimization Constant Load"
@@ -545,7 +565,10 @@ def test_load_fixed_sensor_device_info(mock_coordinator, mock_config_entry):
 def test_load_forecast_sensor_device_info(mock_coordinator, mock_config_entry):
     """Test device info for forecast load sensor."""
     sensor = HaeoElementPowerSensor(
-        mock_coordinator, mock_config_entry, "test_load_forecast", ELEMENT_TYPE_LOAD_FORECAST
+        mock_coordinator,
+        mock_config_entry,
+        "test_load_forecast",
+        ELEMENT_TYPE_FORECAST_LOAD,
     )
     device_info = sensor.device_info
 

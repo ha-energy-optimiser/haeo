@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal
 from dataclasses import dataclass
+from typing import Literal
 
-from .fields import name_field, power_flow_field, element_name_field
+from .fields import element_name_field, name_field, power_flow_field
 
 
 @dataclass

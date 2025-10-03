@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from .fields import name_field, power_field, power_forecast_field
+from .fields import name_field, power_forecast_field
 
 
 @dataclass
@@ -15,5 +15,4 @@ class ForecastLoadConfig:
 
     name: str = name_field("Load name")
 
-    current_power: float = power_field("Current power consumption in watts")
     forecast: Sequence[str] = power_forecast_field("Sensor(s) providing power consumption forecast")

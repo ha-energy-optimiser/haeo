@@ -2,11 +2,7 @@
 
 import pytest
 
-from custom_components.haeo.const import (
-    DOMAIN,
-    ELEMENT_TYPE_BATTERY,
-    ELEMENT_TYPE_GRID,
-)
+from custom_components.haeo.const import DOMAIN, ELEMENT_TYPE_BATTERY, ELEMENT_TYPE_GRID
 
 # Enable custom component for testing
 pytest_plugins = ["pytest_homeassistant_custom_component"]
@@ -15,7 +11,7 @@ pytest_plugins = ["pytest_homeassistant_custom_component"]
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading custom integrations in all tests."""
-    yield
+    return
 
 
 @pytest.fixture

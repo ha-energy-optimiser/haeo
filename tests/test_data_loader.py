@@ -1,20 +1,33 @@
 """Test the HAEO sensor loader."""
 
-import pytest
-from unittest.mock import Mock
-from homeassistant.core import HomeAssistant
-from homeassistant.components.sensor.const import SensorDeviceClass
 from dataclasses import dataclass, field
+from unittest.mock import Mock
 
+from homeassistant.components.sensor.const import SensorDeviceClass
+from homeassistant.const import UnitOfPower
+from homeassistant.core import HomeAssistant
+import pytest
+
+from custom_components.haeo.const import (
+    ATTR_FORECAST,
+    CONF_CAPACITY,
+    CONF_EFFICIENCY,
+    CONF_FORECAST,
+    CONF_IMPORT_PRICE,
+    CONF_INITIAL_CHARGE_PERCENTAGE,
+    CONF_MIN_CHARGE_PERCENTAGE,
+    FIELD_TYPE_CONSTANT,
+    FIELD_TYPE_SENSOR,
+)
 from custom_components.haeo.data_loader import (
     DataLoader,
-    get_field_type,
+    convert_to_base_unit,
     get_field_device_class,
     get_field_property_type,
-    is_sensor_field,
-    is_forecast_field,
+    get_field_type,
     is_constant_field,
-    convert_to_base_unit,
+    is_forecast_field,
+    is_sensor_field,
 )
 
 
@@ -23,92 +36,92 @@ from custom_components.haeo.data_loader import (
 class MockConfigWithBatterySensor:
     """Mock config class with battery sensor field."""
 
-    current_charge: str = field(metadata={"field_type": (SensorDeviceClass.BATTERY, "sensor")})
+    initial_charge_percentage: str = field(metadata={"field_type": (SensorDeviceClass.BATTERY, FIELD_TYPE_SENSOR)})
 
 
 @dataclass
 class MockConfigWithPriceSensor:
     """Mock config class with price sensor field."""
 
-    import_price: str = field(metadata={"field_type": (SensorDeviceClass.MONETARY, "sensor")})
+    import_price: str = field(metadata={"field_type": (SensorDeviceClass.MONETARY, FIELD_TYPE_SENSOR)})
 
 
 @dataclass
 class MockConfigWithPowerSensor:
     """Mock config class with power sensor field."""
 
-    forecast: str = field(metadata={"field_type": (SensorDeviceClass.POWER, "forecast")})
+    forecast: str = field(metadata={"field_type": (SensorDeviceClass.POWER, CONF_FORECAST)})
 
 
 @dataclass
 class MockConfigWithBatterySOC:
     """Mock config class with battery SOC field."""
 
-    min_charge_percentage: float = field(metadata={"field_type": (SensorDeviceClass.BATTERY, "constant")})
+    min_charge_percentage: float = field(metadata={"field_type": (SensorDeviceClass.BATTERY, FIELD_TYPE_CONSTANT)})
 
 
 @dataclass
 class MockConfigWithEfficiency:
     """Mock config class with efficiency field."""
 
-    efficiency: float = field(metadata={"field_type": ("%", "constant")})
+    efficiency: float = field(metadata={"field_type": ("%", FIELD_TYPE_CONSTANT)})
 
 
 @dataclass
 class MockConfigWithCapacity:
     """Mock config class with capacity field."""
 
-    capacity: float = field(metadata={"field_type": ("capacity", "constant")})
+    capacity: float = field(metadata={"field_type": (CONF_CAPACITY, FIELD_TYPE_CONSTANT)})
 
 
 # Field type detection tests
 async def test_get_field_type_battery_sensor(hass: HomeAssistant):
     """Test field type detection for battery sensor."""
-    field_type = get_field_type("current_charge", MockConfigWithBatterySensor)
-    assert field_type == (SensorDeviceClass.BATTERY, "sensor")
+    field_type = get_field_type(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor)
+    assert field_type == (SensorDeviceClass.BATTERY, FIELD_TYPE_SENSOR)
 
 
 async def test_get_field_type_battery_soc_field(hass: HomeAssistant):
     """Test field type detection for battery SOC field."""
-    field_type = get_field_type("min_charge_percentage", MockConfigWithBatterySOC)
-    assert field_type == (SensorDeviceClass.BATTERY, "constant")
+    field_type = get_field_type(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC)
+    assert field_type == (SensorDeviceClass.BATTERY, FIELD_TYPE_CONSTANT)
 
 
 async def test_get_field_type_efficiency_field(hass: HomeAssistant):
     """Test field type detection for efficiency field."""
-    field_type = get_field_type("efficiency", MockConfigWithEfficiency)
-    assert field_type == ("%", "constant")
+    field_type = get_field_type(CONF_EFFICIENCY, MockConfigWithEfficiency)
+    assert field_type == ("%", FIELD_TYPE_CONSTANT)
 
 
 async def test_get_field_type_import_price_sensor(hass: HomeAssistant):
     """Test field type detection for price sensor."""
-    field_type = get_field_type("import_price", MockConfigWithPriceSensor)
-    assert field_type == (SensorDeviceClass.MONETARY, "sensor")
+    field_type = get_field_type(CONF_IMPORT_PRICE, MockConfigWithPriceSensor)
+    assert field_type == (SensorDeviceClass.MONETARY, FIELD_TYPE_SENSOR)
 
 
 async def test_get_field_type_power_sensor(hass: HomeAssistant):
     """Test field type detection for power sensor."""
-    field_type = get_field_type("forecast", MockConfigWithPowerSensor)
-    assert field_type == (SensorDeviceClass.POWER, "forecast")
+    field_type = get_field_type(CONF_FORECAST, MockConfigWithPowerSensor)
+    assert field_type == (SensorDeviceClass.POWER, CONF_FORECAST)
 
 
 # New helper function tests
 async def test_get_field_device_class(hass: HomeAssistant):
     """Test getting device class from field type."""
-    device_class = get_field_device_class("current_charge", MockConfigWithBatterySensor)
+    device_class = get_field_device_class(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor)
     assert device_class == SensorDeviceClass.BATTERY
 
-    device_class = get_field_device_class("efficiency", MockConfigWithEfficiency)
+    device_class = get_field_device_class(CONF_EFFICIENCY, MockConfigWithEfficiency)
     assert device_class == "%"
 
 
 async def test_get_field_property_type(hass: HomeAssistant):
     """Test getting property type from field type."""
-    property_type = get_field_property_type("current_charge", MockConfigWithBatterySensor)
-    assert property_type == "sensor"
+    property_type = get_field_property_type(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor)
+    assert property_type == FIELD_TYPE_SENSOR
 
-    property_type = get_field_property_type("min_charge_percentage", MockConfigWithBatterySOC)
-    assert property_type == "constant"
+    property_type = get_field_property_type(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC)
+    assert property_type == FIELD_TYPE_CONSTANT
 
 
 async def test_get_field_type_unknown_field(hass: HomeAssistant):
@@ -120,39 +133,39 @@ async def test_get_field_type_unknown_field(hass: HomeAssistant):
 # Field classification tests
 async def test_is_sensor_field_true(hass: HomeAssistant):
     """Test sensor field detection for sensor fields."""
-    assert is_sensor_field("current_charge", MockConfigWithBatterySensor) is True
-    assert is_sensor_field("import_price", MockConfigWithPriceSensor) is True
-    assert is_sensor_field("forecast", MockConfigWithPowerSensor) is True
+    assert is_sensor_field(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor) is True
+    assert is_sensor_field(CONF_IMPORT_PRICE, MockConfigWithPriceSensor) is True
+    assert is_sensor_field(CONF_FORECAST, MockConfigWithPowerSensor) is True
 
 
 async def test_is_sensor_field_false(hass: HomeAssistant):
     """Test sensor field detection for non-sensor fields."""
-    assert is_sensor_field("capacity", MockConfigWithCapacity) is False
-    assert is_sensor_field("min_charge_percentage", MockConfigWithBatterySOC) is False
-    assert is_sensor_field("efficiency", MockConfigWithEfficiency) is False
+    assert is_sensor_field(CONF_CAPACITY, MockConfigWithCapacity) is False
+    assert is_sensor_field(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC) is False
+    assert is_sensor_field(CONF_EFFICIENCY, MockConfigWithEfficiency) is False
 
 
 async def test_is_forecast_field_true(hass: HomeAssistant):
     """Test forecast field detection for forecast fields."""
-    assert is_forecast_field("forecast") is True
+    assert is_forecast_field(CONF_FORECAST) is True
     assert is_forecast_field("import_price_forecast") is True
 
 
 async def test_is_forecast_field_false(hass: HomeAssistant):
     """Test forecast field detection for non-forecast fields."""
-    assert is_forecast_field("current_charge") is False
-    assert is_forecast_field("capacity") is False
+    assert is_forecast_field(CONF_INITIAL_CHARGE_PERCENTAGE) is False
+    assert is_forecast_field(CONF_CAPACITY) is False
 
 
 async def test_is_constant_field_true(hass: HomeAssistant):
     """Test constant field detection for constant fields."""
-    assert is_constant_field("capacity", MockConfigWithCapacity) is True
-    assert is_constant_field("min_charge_percentage", MockConfigWithBatterySOC) is True
+    assert is_constant_field(CONF_CAPACITY, MockConfigWithCapacity) is True
+    assert is_constant_field(CONF_MIN_CHARGE_PERCENTAGE, MockConfigWithBatterySOC) is True
 
 
 async def test_is_constant_field_false(hass: HomeAssistant):
     """Test constant field detection for sensor fields."""
-    assert is_constant_field("current_charge", MockConfigWithBatterySensor) is False
+    assert is_constant_field(CONF_INITIAL_CHARGE_PERCENTAGE, MockConfigWithBatterySensor) is False
 
 
 # Unit conversion tests
@@ -170,13 +183,13 @@ async def test_convert_monetary_price(hass: HomeAssistant):
 
 async def test_convert_power_kw_to_w(hass: HomeAssistant):
     """Test unit conversion for power from kW to W."""
-    result = convert_to_base_unit(1000, "kW", SensorDeviceClass.POWER)
+    result = convert_to_base_unit(1000, UnitOfPower.KILO_WATT, SensorDeviceClass.POWER)
     assert result == 1000000.0
 
 
 async def test_convert_power_w_to_w(hass: HomeAssistant):
     """Test unit conversion for power from W to W (no conversion needed)."""
-    result = convert_to_base_unit(1000, "W", SensorDeviceClass.POWER)
+    result = convert_to_base_unit(1000, UnitOfPower.WATT, SensorDeviceClass.POWER)
     assert result == 1000.0
 
 
@@ -218,7 +231,7 @@ async def test_load_sensor_value_available_power(hass: HomeAssistant, sensor_loa
     # Mock sensor state
     mock_state = Mock()
     mock_state.state = "1000"
-    mock_state.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": "W"}
+    mock_state.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": UnitOfPower.WATT}
     mock_hass.states.get.return_value = mock_state
 
     result = await sensor_loader.load_sensor_value("sensor.test_power", SensorDeviceClass.POWER)
@@ -284,8 +297,8 @@ async def test_load_sensor_forecast_with_forecast_attribute(hass: HomeAssistant,
     mock_state.state = "100"
     mock_state.attributes = {
         "device_class": SensorDeviceClass.POWER,
-        "unit_of_measurement": "W",
-        "forecast": [100, 200, 300, 400, 500],
+        "unit_of_measurement": UnitOfPower.WATT,
+        ATTR_FORECAST: [100, 200, 300, 400, 500],
     }
     mock_hass.states.get.return_value = mock_state
 
@@ -298,7 +311,7 @@ async def test_load_sensor_forecast_without_forecast_attribute(hass: HomeAssista
     # Mock sensor state without forecast
     mock_state = Mock()
     mock_state.state = "150"
-    mock_state.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": "W"}
+    mock_state.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": UnitOfPower.WATT}
     mock_hass.states.get.return_value = mock_state
 
     result = await sensor_loader.load_sensor_forecast("sensor.test", "power", 3)
@@ -320,8 +333,8 @@ async def test_load_sensor_forecast_invalid_forecast_data(hass: HomeAssistant, s
     mock_state.state = "100"
     mock_state.attributes = {
         "device_class": SensorDeviceClass.POWER,
-        "unit_of_measurement": "W",
-        "forecast": ["invalid", "data", "here"],
+        "unit_of_measurement": UnitOfPower.WATT,
+        ATTR_FORECAST: ["invalid", "data", "here"],
     }
     mock_hass.states.get.return_value = mock_state
 
@@ -336,8 +349,8 @@ async def test_load_sensor_forecast_multiple_sensors_sum(hass: HomeAssistant, se
     mock_state1.state = "100"
     mock_state1.attributes = {
         "device_class": SensorDeviceClass.POWER,
-        "unit_of_measurement": "W",
-        "forecast": [100, 200, 300],
+        "unit_of_measurement": UnitOfPower.WATT,
+        ATTR_FORECAST: [100, 200, 300],
     }
 
     # Mock second sensor
@@ -345,8 +358,8 @@ async def test_load_sensor_forecast_multiple_sensors_sum(hass: HomeAssistant, se
     mock_state2.state = "50"
     mock_state2.attributes = {
         "device_class": SensorDeviceClass.POWER,
-        "unit_of_measurement": "W",
-        "forecast": [50, 100, 150],
+        "unit_of_measurement": UnitOfPower.WATT,
+        ATTR_FORECAST: [50, 100, 150],
     }
 
     mock_hass.states.get.side_effect = [mock_state1, mock_state2]
@@ -414,7 +427,7 @@ async def test_get_repeated_value_invalid_number(hass: HomeAssistant, sensor_loa
 # New DataLoader tests
 async def test_load_field_data_constant(hass: HomeAssistant, sensor_loader, mock_hass):
     """Test loading constant field data."""
-    result = await sensor_loader.load_field_data("capacity", 1000, MockConfigWithCapacity, 3)
+    result = await sensor_loader.load_field_data(CONF_CAPACITY, 1000, MockConfigWithCapacity, 3)
     assert result == 1000
 
 
@@ -423,11 +436,16 @@ async def test_load_field_data_sensor(hass: HomeAssistant, sensor_loader, mock_h
     # Mock sensor state
     mock_state = Mock()
     mock_state.state = "1000"
-    mock_state.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": "W"}
+    mock_state.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": UnitOfPower.WATT}
     mock_hass.states.get.return_value = mock_state
 
-    result = await sensor_loader.load_field_data("current_charge", "sensor.test", MockConfigWithBatterySensor, 3)
-    assert result == [1000.0, 1000.0, 1000.0]
+    result = await sensor_loader.load_field_data(
+        CONF_INITIAL_CHARGE_PERCENTAGE,
+        "sensor.test",
+        MockConfigWithBatterySensor,
+        3,
+    )
+    assert result == 1000.0
 
 
 async def test_load_field_data_forecast(hass: HomeAssistant, sensor_loader, mock_hass):
@@ -437,12 +455,12 @@ async def test_load_field_data_forecast(hass: HomeAssistant, sensor_loader, mock
     mock_state.state = "100"
     mock_state.attributes = {
         "device_class": SensorDeviceClass.POWER,
-        "unit_of_measurement": "W",
-        "forecast": [100, 200, 300, 400, 500],
+        "unit_of_measurement": UnitOfPower.WATT,
+        ATTR_FORECAST: [100, 200, 300, 400, 500],
     }
     mock_hass.states.get.return_value = mock_state
 
-    result = await sensor_loader.load_field_data("forecast", "sensor.test", MockConfigWithPowerSensor, 3)
+    result = await sensor_loader.load_field_data(CONF_FORECAST, "sensor.test", MockConfigWithPowerSensor, 3)
     assert result == [100, 200, 300]
 
 
@@ -451,26 +469,34 @@ async def test_load_field_data_multiple_sensors(hass: HomeAssistant, sensor_load
     # Mock first sensor
     mock_state1 = Mock()
     mock_state1.state = "100"
-    mock_state1.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": "W"}
+    mock_state1.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": UnitOfPower.WATT}
 
     # Mock second sensor
     mock_state2 = Mock()
     mock_state2.state = "200"
-    mock_state2.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": "W"}
+    mock_state2.attributes = {"device_class": SensorDeviceClass.POWER, "unit_of_measurement": UnitOfPower.WATT}
 
     mock_hass.states.get.side_effect = [mock_state1, mock_state2]
 
     result = await sensor_loader.load_field_data(
-        "current_charge", ["sensor.test1", "sensor.test2"], MockConfigWithBatterySensor, 3
+        CONF_INITIAL_CHARGE_PERCENTAGE,
+        ["sensor.test1", "sensor.test2"],
+        MockConfigWithBatterySensor,
+        3,
     )
-    assert result == [300.0, 300.0, 300.0]  # Sum of both sensors repeated for 3 periods
+    assert result == 300.0  # Sum of both sensors
 
 
 async def test_load_field_data_unavailable_sensor(hass: HomeAssistant, sensor_loader, mock_hass):
     """Test loading data from unavailable sensor."""
     mock_hass.states.get.return_value = None
 
-    result = await sensor_loader.load_field_data("current_charge", "sensor.unavailable", MockConfigWithBatterySensor, 3)
+    result = await sensor_loader.load_field_data(
+        CONF_INITIAL_CHARGE_PERCENTAGE,
+        "sensor.unavailable",
+        MockConfigWithBatterySensor,
+        3,
+    )
     assert result is None
 
 

@@ -1,5 +1,9 @@
 """Constants for the Home Assistant Energy Optimization integration."""
 
+import json
+import logging
+import os
+
 # Integration domain
 DOMAIN = "haeo"
 
@@ -16,8 +20,8 @@ CONF_PARTICIPANTS = "participants"
 ELEMENT_TYPE_BATTERY = "battery"
 ELEMENT_TYPE_CONNECTION = "connection"
 ELEMENT_TYPE_GRID = "grid"
-ELEMENT_TYPE_LOAD_CONSTANT = "load_constant"
-ELEMENT_TYPE_LOAD_FORECAST = "load_forecast"
+ELEMENT_TYPE_CONSTANT_LOAD = "constant_load"
+ELEMENT_TYPE_FORECAST_LOAD = "forecast_load"
 ELEMENT_TYPE_GENERATOR = "generator"
 ELEMENT_TYPE_NET = "net"
 
@@ -25,15 +29,15 @@ ELEMENT_TYPES = [
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_CONNECTION,
     ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_CONSTANT,
-    ELEMENT_TYPE_LOAD_FORECAST,
+    ELEMENT_TYPE_CONSTANT_LOAD,
+    ELEMENT_TYPE_FORECAST_LOAD,
     ELEMENT_TYPE_GENERATOR,
     ELEMENT_TYPE_NET,
 ]
 
 # Battery configuration keys
 CONF_CAPACITY = "capacity"
-CONF_CURRENT_CHARGE = "current_charge"
+CONF_INITIAL_CHARGE_PERCENTAGE = "initial_charge_percentage"
 CONF_MIN_CHARGE_PERCENTAGE = "min_charge_percentage"
 CONF_MAX_CHARGE_PERCENTAGE = "max_charge_percentage"
 CONF_MAX_CHARGE_POWER = "max_charge_power"
@@ -90,25 +94,27 @@ OPTIMIZATION_STATUS_PENDING = "pending"
 # Sensor units
 UNIT_CURRENCY = "USD"  # Could be made configurable
 
+# Field property types
+FIELD_TYPE_SENSOR = "sensor"
+FIELD_TYPE_FORECAST = "forecast"
+FIELD_TYPE_CONSTANT = "constant"
+
 # Entity attribute keys
 ATTR_ENERGY = "energy"
 ATTR_POWER = "power"
+ATTR_FORECAST = "forecast"
 
 
 def get_element_type_name(element_type: str) -> str:
     """Get translated element type name."""
-    import json
-    import os
-    import logging
-
     _logger = logging.getLogger(__name__)
 
     # Map element types to translation keys
     device_type_map = {
         ELEMENT_TYPE_BATTERY: "entity.device.battery",
         ELEMENT_TYPE_GRID: "entity.device.grid_connection",
-        ELEMENT_TYPE_LOAD_CONSTANT: "entity.device.constant_load",
-        ELEMENT_TYPE_LOAD_FORECAST: "entity.device.forecast_load",
+        ELEMENT_TYPE_CONSTANT_LOAD: "entity.device.constant_load",
+        ELEMENT_TYPE_FORECAST_LOAD: "entity.device.forecast_load",
         ELEMENT_TYPE_GENERATOR: "entity.device.generator",
         ELEMENT_TYPE_NET: "entity.device.network_node",
         ELEMENT_TYPE_CONNECTION: "entity.device.connection",
@@ -119,7 +125,7 @@ def get_element_type_name(element_type: str) -> str:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         translations_file = os.path.join(current_dir, "translations", "en.json")
 
-        with open(translations_file, "r", encoding="utf-8") as f:
+        with open(translations_file, encoding="utf-8") as f:
             translations_data = json.load(f)
 
         translation_key = device_type_map.get(element_type)

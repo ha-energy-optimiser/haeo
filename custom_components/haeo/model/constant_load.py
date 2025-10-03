@@ -1,8 +1,7 @@
-
 from .element import Element
 
 
-class LoadConstant(Element):
+class ConstantLoad(Element):
     """Constant load entity for electrical system modeling."""
 
     def __init__(self, name: str, period: int, n_periods: int, power: float):
@@ -13,6 +12,7 @@ class LoadConstant(Element):
             period: Time period in seconds
             n_periods: Number of periods
             power: Constant power consumption in watts
+
         """
         # Create a constant forecast array with the same power value for all periods
         forecast = [power] * n_periods

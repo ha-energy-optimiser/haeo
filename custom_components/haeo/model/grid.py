@@ -1,4 +1,5 @@
-from typing import Sequence
+from collections.abc import Sequence
+
 from pulp import LpVariable
 
 from .element import Element

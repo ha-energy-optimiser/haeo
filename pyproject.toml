@@ -22,6 +22,35 @@ required-version = ">=0.13.0"
 line-length = 120
 target-version = "py313"
 
+[tool.ruff.lint]
+# Enable ALL rules and selectively ignore overly strict ones
+select = ["ALL"]
+
+# Ignore overly strict or unwanted rules
+ignore = [
+    'COM812', # Formatter already deals with trailing commas
+    'D203',   # Don't put a newline between the class and docstring (D211 is used instead)
+    'D213',   # Multiline docstrings have an empty first line (Incompatible with D212)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["haeo"]
+force-sort-within-sections = true
+split-on-trailing-comma = false
+
+[tool.ruff.lint.per-file-ignores]
+
+"tests/**/*.py" = [
+    'S101', # Assert is allowed in tests
+    'B011', # Assert false is allowed in tests
+
+]
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-branches = 15
+max-statements = 60
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

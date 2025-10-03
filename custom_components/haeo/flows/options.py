@@ -5,19 +5,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
-from homeassistant.helpers.selector import (
-    SelectOptionDict,
-    SelectSelector,
-    SelectSelectorConfig,
-    SelectSelectorMode,
-)
+from homeassistant.helpers.selector import SelectOptionDict, SelectSelector, SelectSelectorConfig, SelectSelectorMode
+import voluptuous as vol
 
-from ..const import get_element_type_name, CONF_ELEMENT_TYPE
+from ..const import CONF_ELEMENT_TYPE, CONF_HORIZON_HOURS, CONF_PERIOD_MINUTES, get_element_type_name
 from ..types import ELEMENT_TYPES
-from . import get_schema
+from . import get_network_timing_schema, get_schema, validate_network_timing_input
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,7 +24,44 @@ class HubOptionsFlow(config_entries.OptionsFlow):
         """Manage the options."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_participant", "edit_participant", "remove_participant"],
+            menu_options=["configure_network", "add_participant", "edit_participant", "remove_participant"],
+        )
+
+    async def async_step_configure_network(self, user_input: dict[str, Any] | None = None):
+        """Configure network timing parameters."""
+        if user_input is not None:
+            # Validate input using shared function
+            errors, validated_data = validate_network_timing_input(user_input)
+
+            if errors:
+                data_schema = get_network_timing_schema(config_entry=self.config_entry)
+                return self.async_show_form(
+                    step_id="configure_network",
+                    data_schema=data_schema,
+                    errors=errors,
+                )
+
+            # Update network timing configuration
+            new_data = self.config_entry.data.copy()
+            new_data[CONF_HORIZON_HOURS] = validated_data[CONF_HORIZON_HOURS]
+            new_data[CONF_PERIOD_MINUTES] = validated_data[CONF_PERIOD_MINUTES]
+
+            self.hass.config_entries.async_update_entry(self.config_entry, data=new_data)
+
+            # Reload the integration to ensure devices are updated
+            try:
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            except Exception as ex:
+                _LOGGER.warning("Failed to reload integration after updating network config: %s", ex)
+
+            return self.async_create_entry(title="", data={})
+
+        # Show form with network timing configuration
+        data_schema = get_network_timing_schema(config_entry=self.config_entry)
+
+        return self.async_show_form(
+            step_id="configure_network",
+            data_schema=data_schema,
         )
 
     async def async_step_add_participant(self, user_input: dict[str, Any] | None = None):
@@ -54,14 +86,17 @@ class HubOptionsFlow(config_entries.OptionsFlow):
                         SelectSelectorConfig(
                             options=participant_types,
                             mode=SelectSelectorMode.DROPDOWN,
-                        )
+                        ),
                     ),
-                }
+                },
             ),
         )
 
     async def async_step_configure_element(
-        self, element_type: str, user_input: dict[str, Any] | None = None, current_config: dict[str, Any] | None = None
+        self,
+        element_type: str,
+        user_input: dict[str, Any] | None = None,
+        current_config: dict[str, Any] | None = None,
     ):
         """Configure participant."""
         errors: dict[str, str] = {}
@@ -71,17 +106,16 @@ class HubOptionsFlow(config_entries.OptionsFlow):
 
             # Check for duplicate names (excluding current if editing)
             if self._check_participant_name_exists(
-                name, exclude_current=current_config.get(CONF_NAME) if current_config else None
+                name,
+                exclude_current=current_config.get(CONF_NAME) if current_config else None,
             ):
                 errors[CONF_NAME] = "name_exists"
-            else:
-                if not errors:
-                    # Add or update participant in configuration
-                    participant = {CONF_ELEMENT_TYPE: element_type, **user_input}
-                    if current_config:
-                        return await self._update_participant(current_config[CONF_NAME], participant)
-                    else:
-                        return await self._add_participant(name, participant)
+            elif not errors:
+                # Add or update participant in configuration
+                participant = {CONF_ELEMENT_TYPE: element_type, **user_input}
+                if current_config:
+                    return await self._update_participant(current_config[CONF_NAME], participant)
+                return await self._add_participant(name, participant)
 
         # Get participants for schema if needed
         participants = self.config_entry.data.get("participants", {})
@@ -117,9 +151,9 @@ class HubOptionsFlow(config_entries.OptionsFlow):
                         SelectSelectorConfig(
                             options=participant_options,
                             mode=SelectSelectorMode.DROPDOWN,
-                        )
+                        ),
                     ),
-                }
+                },
             ),
         )
 
@@ -160,9 +194,9 @@ class HubOptionsFlow(config_entries.OptionsFlow):
                         SelectSelectorConfig(
                             options=participant_options,
                             mode=SelectSelectorMode.DROPDOWN,
-                        )
+                        ),
                     ),
-                }
+                },
             ),
         )
 
@@ -172,9 +206,8 @@ class HubOptionsFlow(config_entries.OptionsFlow):
         if exclude_current and exclude_current in participants:
             # If we're editing, allow the current name
             return name in participants and name != exclude_current
-        else:
-            # If we're creating, don't allow any duplicates
-            return name in participants
+        # If we're creating, don't allow any duplicates
+        return name in participants
 
     async def _add_participant(self, name: str, participant_config: dict[str, Any]):
         """Add a participant to the configuration."""

@@ -1,16 +1,16 @@
 """Test battery config flow."""
 
 from custom_components.haeo.const import (
-    CONF_NAME,
     CONF_CAPACITY,
-    CONF_CURRENT_CHARGE,
-    CONF_MIN_CHARGE_PERCENTAGE,
+    CONF_CHARGE_COST,
+    CONF_DISCHARGE_COST,
+    CONF_EFFICIENCY,
+    CONF_INITIAL_CHARGE_PERCENTAGE,
     CONF_MAX_CHARGE_PERCENTAGE,
     CONF_MAX_CHARGE_POWER,
     CONF_MAX_DISCHARGE_POWER,
-    CONF_EFFICIENCY,
-    CONF_CHARGE_COST,
-    CONF_DISCHARGE_COST,
+    CONF_MIN_CHARGE_PERCENTAGE,
+    CONF_NAME,
 )
 
 # Test data for battery flow
@@ -20,7 +20,7 @@ VALID_DATA = [
         "config": {
             CONF_NAME: "Test Battery",
             CONF_CAPACITY: 10000,
-            CONF_CURRENT_CHARGE: "sensor.battery_charge",
+            CONF_INITIAL_CHARGE_PERCENTAGE: "sensor.battery_charge",
             CONF_MAX_CHARGE_POWER: 5000,
             CONF_MAX_DISCHARGE_POWER: 5000,
             CONF_CHARGE_COST: 0.0,
@@ -32,7 +32,7 @@ VALID_DATA = [
         "config": {
             CONF_NAME: "Advanced Battery",
             CONF_CAPACITY: 10000,
-            CONF_CURRENT_CHARGE: "sensor.battery_charge",
+            CONF_INITIAL_CHARGE_PERCENTAGE: "sensor.battery_charge",
             CONF_MIN_CHARGE_PERCENTAGE: 10,
             CONF_MAX_CHARGE_PERCENTAGE: 90,
             CONF_MAX_CHARGE_POWER: 5000,
@@ -50,7 +50,7 @@ INVALID_DATA = [
         "config": {
             CONF_NAME: "",
             CONF_CAPACITY: 5000,
-            CONF_CURRENT_CHARGE: "sensor.test",
+            CONF_INITIAL_CHARGE_PERCENTAGE: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,
             CONF_MAX_DISCHARGE_POWER: 5000,
             CONF_CHARGE_COST: 0.0,
@@ -63,7 +63,7 @@ INVALID_DATA = [
         "config": {
             CONF_NAME: "Test Battery",
             CONF_CAPACITY: -1000,
-            CONF_CURRENT_CHARGE: "sensor.test",
+            CONF_INITIAL_CHARGE_PERCENTAGE: "sensor.test",
             CONF_MAX_CHARGE_POWER: 5000,
             CONF_MAX_DISCHARGE_POWER: 5000,
             CONF_CHARGE_COST: 0.0,

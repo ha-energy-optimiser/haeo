@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from typing import Any
 from unittest.mock import patch
 
@@ -10,21 +9,22 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.haeo.const import (
+    CONF_CAPACITY,
+    CONF_ELEMENT_TYPE,
+    CONF_IMPORT_LIMIT,
     DOMAIN,
     ELEMENT_TYPE_BATTERY,
     ELEMENT_TYPE_CONNECTION,
-    ELEMENT_TYPE_GRID,
-    ELEMENT_TYPE_LOAD_CONSTANT,
-    ELEMENT_TYPE_LOAD_FORECAST,
+    ELEMENT_TYPE_CONSTANT_LOAD,
+    ELEMENT_TYPE_FORECAST_LOAD,
     ELEMENT_TYPE_GENERATOR,
+    ELEMENT_TYPE_GRID,
     ELEMENT_TYPE_NET,
     ELEMENT_TYPES,
-    CONF_CAPACITY,
-    CONF_IMPORT_LIMIT,
-    CONF_ELEMENT_TYPE,
 )
 
 # Import the schema helper from the main flows module
@@ -34,16 +34,20 @@ from custom_components.haeo.flows import get_schema
 # Combined test data for fixtures
 def _get_test_data():
     """Get test data from individual files."""
-    from .test_data.battery import VALID_DATA as BATTERY_VALID_DATA, INVALID_DATA as BATTERY_INVALID_DATA
-    from .test_data.connection import VALID_DATA as CONNECTION_VALID_DATA, INVALID_DATA as CONNECTION_INVALID_DATA
-    from .test_data.generator import VALID_DATA as GENERATOR_VALID_DATA, INVALID_DATA as GENERATOR_INVALID_DATA
-    from .test_data.grid import VALID_DATA as GRID_VALID_DATA, INVALID_DATA as GRID_INVALID_DATA
-    from .test_data.load_constant import VALID_DATA as LOAD_VALID_DATA, INVALID_DATA as LOAD_INVALID_DATA
-    from .test_data.load_forecast import (
-        VALID_DATA as LOAD_FORECAST_VALID_DATA,
-        INVALID_DATA as LOAD_FORECAST_INVALID_DATA,
-    )
-    from .test_data.net import VALID_DATA as NET_VALID_DATA, INVALID_DATA as NET_INVALID_DATA
+    from .test_data.battery import INVALID_DATA as BATTERY_INVALID_DATA
+    from .test_data.battery import VALID_DATA as BATTERY_VALID_DATA
+    from .test_data.connection import INVALID_DATA as CONNECTION_INVALID_DATA
+    from .test_data.connection import VALID_DATA as CONNECTION_VALID_DATA
+    from .test_data.constant_load import INVALID_DATA as LOAD_INVALID_DATA
+    from .test_data.constant_load import VALID_DATA as LOAD_VALID_DATA
+    from .test_data.forecast_load import INVALID_DATA as LOAD_FORECAST_INVALID_DATA
+    from .test_data.forecast_load import VALID_DATA as LOAD_FORECAST_VALID_DATA
+    from .test_data.generator import INVALID_DATA as GENERATOR_INVALID_DATA
+    from .test_data.generator import VALID_DATA as GENERATOR_VALID_DATA
+    from .test_data.grid import INVALID_DATA as GRID_INVALID_DATA
+    from .test_data.grid import VALID_DATA as GRID_VALID_DATA
+    from .test_data.net import INVALID_DATA as NET_INVALID_DATA
+    from .test_data.net import VALID_DATA as NET_VALID_DATA
 
     # Create dictionary structure for easier access
     valid_data_by_type = {
@@ -51,8 +55,8 @@ def _get_test_data():
         ELEMENT_TYPE_CONNECTION: CONNECTION_VALID_DATA,
         ELEMENT_TYPE_GENERATOR: GENERATOR_VALID_DATA,
         ELEMENT_TYPE_GRID: GRID_VALID_DATA,
-        ELEMENT_TYPE_LOAD_CONSTANT: LOAD_VALID_DATA,
-        ELEMENT_TYPE_LOAD_FORECAST: LOAD_FORECAST_VALID_DATA,
+        ELEMENT_TYPE_CONSTANT_LOAD: LOAD_VALID_DATA,
+        ELEMENT_TYPE_FORECAST_LOAD: LOAD_FORECAST_VALID_DATA,
         ELEMENT_TYPE_NET: NET_VALID_DATA,
     }
 
@@ -61,8 +65,8 @@ def _get_test_data():
         ELEMENT_TYPE_CONNECTION: CONNECTION_INVALID_DATA,
         ELEMENT_TYPE_GENERATOR: GENERATOR_INVALID_DATA,
         ELEMENT_TYPE_GRID: GRID_INVALID_DATA,
-        ELEMENT_TYPE_LOAD_CONSTANT: LOAD_INVALID_DATA,
-        ELEMENT_TYPE_LOAD_FORECAST: LOAD_FORECAST_INVALID_DATA,
+        ELEMENT_TYPE_CONSTANT_LOAD: LOAD_INVALID_DATA,
+        ELEMENT_TYPE_FORECAST_LOAD: LOAD_FORECAST_INVALID_DATA,
         ELEMENT_TYPE_NET: NET_INVALID_DATA,
     }
 
@@ -91,7 +95,7 @@ HUB_VALID_DATA = {"name": "Test Hub"}
 MOCK_PARTICIPANTS = {
     "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
     "Grid1": {"type": ELEMENT_TYPE_GRID, CONF_IMPORT_LIMIT: 5000},
-    "Load1": {"type": ELEMENT_TYPE_LOAD_CONSTANT, "power": 2000},
+    "Load1": {"type": ELEMENT_TYPE_CONSTANT_LOAD, "power": 2000},
 }
 
 
@@ -147,7 +151,7 @@ def config_entry_with_existing_participant(element_type, valid_element_data):
     """Fixture providing config entry with existing participant."""
     existing_name = valid_element_data.get(CONF_NAME, "Existing Element")
     participants = {
-        existing_name: {"type": element_type, **{k: v for k, v in valid_element_data.items() if k != CONF_NAME}}
+        existing_name: {"type": element_type, **{k: v for k, v in valid_element_data.items() if k != CONF_NAME}},
     }
 
     return create_mock_config_entry(
@@ -155,7 +159,7 @@ def config_entry_with_existing_participant(element_type, valid_element_data):
             "integration_type": "hub",
             "name": "Power Network",
             "participants": participants,
-        }
+        },
     )
 
 
@@ -179,7 +183,7 @@ def config_entry_with_multiple_participants():
             "integration_type": "hub",
             "name": "Power Network",
             "participants": participants,
-        }
+        },
     )
 
 
@@ -293,7 +297,7 @@ async def test_options_flow_route_to_connection_config_with_participants(hass: H
                 "Battery1": {"type": ELEMENT_TYPE_BATTERY, CONF_CAPACITY: 10000},
                 "Grid1": {"type": ELEMENT_TYPE_GRID, CONF_IMPORT_LIMIT: 5000},
             },
-        }
+        },
     )
     options_flow = HubOptionsFlow()
     options_flow.hass = hass

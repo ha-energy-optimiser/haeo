@@ -3,11 +3,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
@@ -17,12 +13,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DOMAIN,
-    OPTIMIZATION_STATUS_SUCCESS,
-    OPTIMIZATION_STATUS_PENDING,
-    UNIT_CURRENCY,
-    ATTR_POWER,
     ATTR_ENERGY,
+    ATTR_POWER,
+    DOMAIN,
+    OPTIMIZATION_STATUS_PENDING,
+    OPTIMIZATION_STATUS_SUCCESS,
+    UNIT_CURRENCY,
     get_element_type_name,
 )
 from .coordinator import HaeoDataUpdateCoordinator
@@ -238,8 +234,7 @@ class HaeoOptimizationStatusSensor(HaeoSensorBase):
         """Return the icon of the sensor."""
         if self.coordinator.optimization_status == OPTIMIZATION_STATUS_SUCCESS:
             return "mdi:check-circle"
-        else:
-            return "mdi:alert-circle"
+        return "mdi:alert-circle"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
@@ -306,7 +301,7 @@ class HaeoElementPowerSensor(HaeoSensorBase):
                     timestamps = self.coordinator.get_future_timestamps()
                     if len(timestamps) == len(power_data):
                         attrs["timestamped_forecast"] = [
-                            {"timestamp": ts, "value": value} for ts, value in zip(timestamps, power_data)
+                            {"timestamp": ts, "value": value} for ts, value in zip(timestamps, power_data, strict=False)
                         ]
                 except Exception as ex:
                     _LOGGER.debug("Error getting timestamps for %s: %s", self.element_name, ex)
@@ -327,7 +322,12 @@ class HaeoElementEnergySensor(HaeoSensorBase):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(
-            coordinator, config_entry, f"{element_name}_energy", f"{element_name} Energy", element_name, element_type
+            coordinator,
+            config_entry,
+            f"{element_name}_energy",
+            f"{element_name} Energy",
+            element_name,
+            element_type,
         )
         self.element_name = element_name
         self._attr_device_class = SensorDeviceClass.ENERGY_STORAGE
@@ -364,7 +364,8 @@ class HaeoElementEnergySensor(HaeoSensorBase):
                     timestamps = self.coordinator.get_future_timestamps()
                     if len(timestamps) == len(energy_data):
                         attrs["timestamped_forecast"] = [
-                            {"timestamp": ts, "value": value} for ts, value in zip(timestamps, energy_data)
+                            {"timestamp": ts, "value": value}
+                            for ts, value in zip(timestamps, energy_data, strict=False)
                         ]
                 except Exception as ex:
                     _LOGGER.debug("Error getting timestamps for %s: %s", self.element_name, ex)

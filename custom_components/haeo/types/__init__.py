@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Union
 
 from .battery import BatteryConfig
-from .grid import GridConfig
-from .load_constant import LoadConstantConfig
-from .load_forecast import LoadForecastConfig
-from .generator import GeneratorConfig
 from .connection import ConnectionConfig
+from .constant_load import ConstantLoadConfig
+from .forecast_load import ForecastLoadConfig
+from .generator import GeneratorConfig
+from .grid import GridConfig
 from .net import NetConfig
 
 # List of all element types for iteration
@@ -18,8 +18,8 @@ ELEMENT_TYPES = {
     "connection": ConnectionConfig,
     "generator": GeneratorConfig,
     "grid": GridConfig,
-    "load_constant": LoadConstantConfig,
-    "load_forecast": LoadForecastConfig,
+    "constant_load": ConstantLoadConfig,
+    "forecast_load": ForecastLoadConfig,
     "net": NetConfig,
 }
 
@@ -27,8 +27,8 @@ ELEMENT_TYPES = {
 ElementConfig = Union[
     BatteryConfig,
     GridConfig,
-    LoadConstantConfig,
-    LoadForecastConfig,
+    ConstantLoadConfig,
+    ForecastLoadConfig,
     GeneratorConfig,
     NetConfig,
     ConnectionConfig,

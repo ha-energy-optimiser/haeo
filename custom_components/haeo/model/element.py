@@ -1,6 +1,7 @@
+from collections.abc import MutableSequence, Sequence
 from dataclasses import dataclass
-from typing import Sequence, MutableSequence
-from pulp import LpVariable, LpConstraint, lpSum
+
+from pulp import LpConstraint, LpVariable, lpSum
 
 
 @dataclass
@@ -48,10 +49,14 @@ class Element:
         # Handle separate consumption and production pricing
         if self.price_consumption is not None and self.power_consumption is not None:
             # Revenue for consumption (exporting to grid) - negative cost = revenue
-            cost += lpSum(-price * power for price, power in zip(self.price_consumption, self.power_consumption))
+            cost += lpSum(
+                -price * power for price, power in zip(self.price_consumption, self.power_consumption, strict=False)
+            )
 
         if self.price_production is not None and self.power_production is not None:
             # Cost for production (importing from grid)
-            cost += lpSum(price * power for price, power in zip(self.price_production, self.power_production))
+            cost += lpSum(
+                price * power for price, power in zip(self.price_production, self.power_production, strict=False)
+            )
 
         return cost

@@ -1,12 +1,6 @@
 """Test data and validation for connection flow configuration."""
 
-from custom_components.haeo.const import (
-    CONF_NAME,
-    CONF_SOURCE,
-    CONF_TARGET,
-    CONF_MIN_POWER,
-    CONF_MAX_POWER,
-)
+from custom_components.haeo.const import CONF_MAX_POWER, CONF_MIN_POWER, CONF_NAME, CONF_SOURCE, CONF_TARGET
 
 # Test data for connection flow
 VALID_DATA = [

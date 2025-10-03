@@ -1,13 +1,14 @@
+from collections.abc import MutableSequence, Sequence
 from dataclasses import dataclass, field
-from typing import Sequence, Dict, MutableSequence
-from pulp import LpConstraint, LpProblem, LpMinimize, LpStatus, value, lpSum
 
-from .element import Element
-from .connection import Connection
+from pulp import LpConstraint, LpMinimize, LpProblem, LpStatus, lpSum, value
+
 from .battery import Battery
+from .connection import Connection
+from .constant_load import ConstantLoad
+from .element import Element
+from .forecast_load import ForecastLoad
 from .generator import Generator
-from .load_constant import LoadConstant
-from .load_forecast import LoadForecast
 from .grid import Grid
 from .net import Net
 
@@ -19,7 +20,7 @@ class Network:
     name: str
     period: int
     n_periods: int
-    elements: Dict[str, Element] = field(default_factory=dict)
+    elements: dict[str, Element] = field(default_factory=dict)
 
     def add(self, element_type: str, name: str, **kwargs) -> Element:
         """Add an element to the network by type.
@@ -31,13 +32,14 @@ class Network:
 
         Returns:
             The created element
+
         """
         # Set n_periods if not provided and required by element type
         self.elements[name] = {
             "battery": Battery,
             "generator": Generator,
-            "load_constant": LoadConstant,
-            "load_forecast": LoadForecast,
+            "constant_load": ConstantLoad,
+            "forecast_load": ForecastLoad,
             "grid": Grid,
             "net": Net,
             "connection": Connection,
@@ -92,6 +94,7 @@ class Network:
 
         Returns:
             The total optimization cost
+
         """
         # Create the LP problem
         prob = LpProblem(f"{self.name}_optimization", LpMinimize)
@@ -120,12 +123,10 @@ class Network:
             print(f"Debug: total_cost = {total_cost}")
             print(f"Debug: returning total_cost = {total_cost}")
             return total_cost
-        else:
-            raise ValueError(f"Optimization failed with status: {LpStatus[status]}")
+        raise ValueError(f"Optimization failed with status: {LpStatus[status]}")
 
     def validate(self) -> None:
         """Validate the network."""
-
         # Check that all connection elements have valid source and target elements
         for element in self.elements.values():
             if isinstance(element, Connection):
