@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 
@@ -29,8 +29,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaeoConfigEntry) -> bool
     coordinator = HaeoDataUpdateCoordinator(hass, entry)
     entry.runtime_data = coordinator
 
-    # Set up config entry update listener
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    # Forward entry setup to supported platforms (sensors, etc.)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception as ex:
+        _LOGGER.exception("Failed to set up HAEO platforms")
+        # Ensure we clean up coordinator on failure so we can retry cleanly
+        entry.runtime_data = None
+        raise ConfigEntryNotReady from ex
 
     try:
         # Fetch initial data
