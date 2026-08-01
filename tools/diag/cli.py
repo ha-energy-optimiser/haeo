@@ -13,7 +13,7 @@ This tool loads a HAEO diagnostics export and either:
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,6 +26,8 @@ from zoneinfo import ZoneInfo
 import numpy as np
 from tabulate import tabulate
 
+from custom_components.haeo.core.adapters.elements.policy import extract_policy_rules
+from custom_components.haeo.core.adapters.policy_compilation import CompiledPolicyRule, compile_policies
 from custom_components.haeo.core.adapters.registry import ELEMENT_TYPES, collect_model_elements, is_element_type
 from custom_components.haeo.core.const import CONF_ELEMENT_TYPE, CONF_NAME
 from custom_components.haeo.core.data.forecast_times import generate_forecast_timestamps, tiers_to_periods_seconds
@@ -33,10 +35,12 @@ from custom_components.haeo.core.data.loader.config_loader import load_element_c
 from custom_components.haeo.core.data.loader.extractors.utils.parse_datetime import parse_datetime_to_timestamp
 from custom_components.haeo.core.model import Network
 from custom_components.haeo.core.model.output_data import OutputData
-from custom_components.haeo.core.schema.elements import ElementConfigData
+from custom_components.haeo.core.schema.elements import ElementConfigData, ElementType
 from custom_components.haeo.core.schema.migrations.v1_3 import migrate_element_config
 from custom_components.haeo.core.schema.sections import SECTION_PRICING
 from custom_components.haeo.core.schema.sections.common import CONF_CONNECTION
+
+from .analysis import describe_analyses, run_analysis
 
 MIN_INTERVAL_POINTS = 2
 
@@ -166,6 +170,16 @@ def normalize_participant_config_for_diag(element_config: dict[str, Any]) -> dic
 
     migrated = migrate_element_config(element_config)
     return migrated if migrated is not None else element_config
+
+
+def collect_policy_rules(participants: Mapping[str, ElementConfigData]) -> list[CompiledPolicyRule]:
+    """Extract compiled policy rules from the policy participants."""
+    return [
+        rule
+        for config in participants.values()
+        if config[CONF_ELEMENT_TYPE] == ElementType.POLICY
+        for rule in extract_policy_rules(config)
+    ]
 
 
 def format_currency(value: float) -> str:
@@ -829,12 +843,30 @@ def format_comparison_table(
     return "\n".join(result_parts)
 
 
+def run_analyses(specs: Sequence[str], diag: DiagnosticsData) -> None:
+    """Run each analysis spec against the loaded diagnostics and print the results."""
+    if not diag.outputs:
+        print("Error: No outputs in diagnostics file to analyze")
+        sys.exit(1)
+
+    for index, spec in enumerate(specs):
+        if index:
+            print()
+        print(f"=== {spec} ===")
+        try:
+            print(run_analysis(spec, diag.outputs, diag.config))
+        except KeyError as err:
+            print(err.args[0])
+            sys.exit(1)
+
+
 def run_diagnostics(
     path: Path,
     *,
     outputs_only: bool = False,
     compare: bool = False,
     preset: str | None = None,
+    analyses: Sequence[str] = (),
 ) -> None:
     """Run diagnostics processing from a file.
 
@@ -843,6 +875,8 @@ def run_diagnostics(
         outputs_only: If True, skip optimization and display pre-computed outputs
         preset: Override horizon preset for tier alignment
         compare: If True, show comparison table of diagnostics vs rerun outputs
+        analyses: Analysis specs (``name`` or ``name:argument``) to run instead
+            of the plan table
 
     """
     # Load diagnostics
@@ -852,6 +886,10 @@ def run_diagnostics(
     else:
         print(f"Loading diagnostics from file: {path}")
         diag = DiagnosticsData.from_file(path)
+
+    if analyses:
+        run_analyses(analyses, diag)
+        return
 
     # Extract configuration
     config = diag.config
@@ -995,7 +1033,11 @@ def run_diagnostics(
     print("\nCreating network...")
     periods_hours = np.asarray(periods_seconds, dtype=float) / 3600
     network = Network(name="diag", periods=periods_hours)
-    for elem in collect_model_elements(loaded_participants):
+    compiled = compile_policies(
+        list(collect_model_elements(loaded_participants)),
+        collect_policy_rules(loaded_participants),
+    )
+    for elem in compiled["elements"]:
         network.add(elem)
     print(f"Network elements: {list(network.elements.keys())}")
 
@@ -1039,7 +1081,6 @@ Examples:
         "--file",
         "-f",
         type=Path,
-        required=True,
         help="Path to diagnostics JSON file or directory with split files",
     )
     parser.add_argument(
@@ -1060,8 +1101,28 @@ Examples:
         choices=["2_days", "3_days", "5_days", "7_days"],
         help="Override horizon preset for tier alignment (use when diagnostics lacks preset)",
     )
+    parser.add_argument(
+        "--analysis",
+        "-a",
+        action="append",
+        default=[],
+        metavar="NAME[:ARG]",
+        help="Run an analysis instead of printing the plan (repeatable); see --list-analyses",
+    )
+    parser.add_argument(
+        "--list-analyses",
+        action="store_true",
+        help="List the available analyses and exit",
+    )
 
     args = parser.parse_args()
+
+    if args.list_analyses:
+        print(describe_analyses())
+        return
+
+    if args.file is None:
+        parser.error("the following arguments are required: --file/-f")
 
     if not args.file.exists():
         print(f"Error: File not found: {args.file}")
@@ -1070,7 +1131,13 @@ Examples:
     if args.compare and args.outputs_only:
         print("Warning: --compare implies running optimization, ignoring --outputs-only")
 
-    run_diagnostics(args.file, outputs_only=args.outputs_only, compare=args.compare, preset=args.preset)
+    run_diagnostics(
+        args.file,
+        outputs_only=args.outputs_only,
+        compare=args.compare,
+        preset=args.preset,
+        analyses=args.analysis,
+    )
 
 
 if __name__ == "__main__":
