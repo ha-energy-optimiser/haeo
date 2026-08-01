@@ -147,7 +147,7 @@ The registries reference each other, so this order keeps the type checker useful
 
 Steps 4 through 6 are part of the change, not follow-up work, and CI checks all three.
 
-Run `./tools/check.sh --fast` between steps and `./tools/check.sh` before finishing.
+Run `uv run check --fast` between steps and `uv run check` before finishing.
 Pyright catches missing registry entries, the flow and adapter tests catch missing test data,
 the output completeness test catches an output name declared but never produced,
 and the translation tests catch strings missing for a registered type.

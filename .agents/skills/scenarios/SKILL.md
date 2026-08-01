@@ -119,7 +119,7 @@ npm --prefix frontend/haeo-forecast-card ci
 npm --prefix frontend/haeo-forecast-card run build
 ```
 
-CI does this before its scenario job, and `./tools/check.sh` does it automatically.
+CI does this before its scenario job, and `uv run check` does it automatically.
 Running scenarios by hand means doing it yourself once.
 
 ## Creating new scenarios

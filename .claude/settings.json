@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./tools/check.sh:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git ls-files:*)",
@@ -9,9 +8,9 @@
       "Bash(git status:*)",
       "Bash(npm --prefix frontend/haeo-forecast-card ci)",
       "Bash(npm --prefix frontend/haeo-forecast-card run build)",
-      "Bash(npm --prefix frontend/haeo-forecast-card run check)",
       "Bash(npm ci)",
       "Bash(npx prettier@3:*)",
+      "Bash(python3 tools/check.py:*)",
       "Bash(uv run diag:*)",
       "Bash(uv run lint-imports:*)",
       "Bash(uv run mdformat:*)",

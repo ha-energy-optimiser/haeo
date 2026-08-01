@@ -201,7 +201,7 @@ Read the skill covering an area before changing code in it.
 
 ## Verification
 
-Run `./tools/check.sh` before considering work complete.
+Run `uv run check` before considering work complete.
 It runs every CI job that can run locally — ruff, pyright, import boundaries, mdformat, prettier, version consistency, unit tests, scenario tests, and frontend card checks — in about 65 seconds.
 `--fast` runs ruff, pyright, and unit tests in about 35.
 `hassfest` and HACS validation have no local equivalent and run only in GitHub Actions.
