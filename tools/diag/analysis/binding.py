@@ -50,6 +50,11 @@ def run(outputs: Mapping[str, Any], config: Mapping[str, Any], argument: str) ->
     except ValueError:
         return f"binding: tolerance must be a number, got {argument!r}"
 
+    # A negative tolerance passes every dual, including exact zeros, which would
+    # report slack constraints as forced decisions.
+    if tolerance < 0:
+        return f"binding: tolerance must not be negative, got {tolerance:g}"
+
     shadow_ids = sorted(entity_id for entity_id in outputs if entity_id.endswith(SHADOW_SUFFIX))
     if not shadow_ids:
         return "binding: the export contains no shadow-price entities"

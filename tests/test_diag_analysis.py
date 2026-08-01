@@ -86,6 +86,16 @@ def test_binding_rejects_a_non_numeric_tolerance(config: dict[str, Any]) -> None
     assert "tolerance must be a number" in run_analysis("binding:abc", {"x_shadow_price": entity([])}, config)
 
 
+def test_binding_rejects_a_negative_tolerance(config: dict[str, Any]) -> None:
+    """A negative tolerance would report every slack constraint as forced."""
+    outputs = {"sensor.grid_max_export_power_shadow_price": entity([("09:00", 0.0)])}
+
+    result = run_analysis("binding:-1", outputs, config)
+
+    assert "must not be negative" in result
+    assert "CAPACITY LIMITS REACHED — the optimizer was forced here" not in result
+
+
 def test_series_filters_by_regex(outputs: dict[str, Any], config: dict[str, Any]) -> None:
     """The regex argument selects which entities appear as columns."""
     result = run_analysis("series:battery_state_of_charge", outputs, config)
@@ -97,6 +107,14 @@ def test_series_filters_by_regex(outputs: dict[str, Any], config: dict[str, Any]
 def test_series_reports_when_nothing_matches(outputs: dict[str, Any], config: dict[str, Any]) -> None:
     """A regex matching nothing explains itself instead of printing an empty table."""
     assert "no entity ids match" in run_analysis("series:zzzznope", outputs, config)
+
+
+def test_series_reports_an_invalid_regex(outputs: dict[str, Any], config: dict[str, Any]) -> None:
+    """A malformed regex produces a readable message rather than a traceback."""
+    result = run_analysis("series:[", outputs, config)
+
+    assert "not a valid regex" in result
+    assert "unterminated character set" in result
 
 
 def test_series_reports_entities_without_a_forecast(config: dict[str, Any]) -> None:

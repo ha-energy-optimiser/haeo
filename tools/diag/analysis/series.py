@@ -59,7 +59,11 @@ def column_labels(entity_ids: Sequence[str], limit: int = LABEL_WIDTH) -> dict[s
 
 def run(outputs: Mapping[str, Any], config: Mapping[str, Any], argument: str) -> str:  # noqa: ARG001 (config unused; the analysis interface is uniform across modules)
     """Return a time-aligned table of the output series matching `argument`."""
-    pattern = re.compile(argument or ".", re.IGNORECASE)
+    try:
+        pattern = re.compile(argument or ".", re.IGNORECASE)
+    except re.error as err:
+        return f"series: {argument!r} is not a valid regex ({err.msg} at position {err.pos})"
+
     matched = sorted(entity_id for entity_id in outputs if pattern.search(entity_id))
     if not matched:
         return f"series: no entity ids match {argument or '.'!r}"
