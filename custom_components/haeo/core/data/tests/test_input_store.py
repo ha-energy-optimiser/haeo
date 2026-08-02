@@ -419,3 +419,34 @@ async def test_calendar_store_missing_entity_is_unavailable() -> None:
 
     assert not await store.async_load(FakeStateMachine({}))
     assert not store.available
+
+
+async def test_calendar_store_replays_captured_events() -> None:
+    """Captured events in the persisted value resolve without entity state."""
+    storage = _MemStorage(
+        {
+            "type": "calendar",
+            "value": "calendar.trips",
+            "events": [
+                {
+                    "start": "1970-01-01T00:00:00+00:00",
+                    "end": "1970-01-01T00:05:00+00:00",
+                    "summary": "Trip",
+                    "location": None,
+                    "description": None,
+                }
+            ],
+        }
+    )
+    hint = FieldHint(
+        output_type=OutputType.ENERGY,
+        time_series=True,
+        boundaries=True,
+        calendar=CalendarFieldHint(parser="presence"),
+    )
+    store = create_input_store(storage=storage, hint=hint, get_forecast_timestamps=_timestamps)
+
+    assert await store.async_load(FakeStateMachine({}))
+    value = store.value
+    assert isinstance(value, dict)
+    np.testing.assert_allclose(value["presence"], [1.0, 0.0, 0.0])

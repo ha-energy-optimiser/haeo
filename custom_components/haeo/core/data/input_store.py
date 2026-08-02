@@ -26,7 +26,7 @@ import numpy as np
 from custom_components.haeo.core.data.loader.calendar_resolver import CalendarBoundaryData
 from custom_components.haeo.core.data.loader.config_loader import is_percent_field, resolve_constant, resolve_field
 from custom_components.haeo.core.data.storage import Storage
-from custom_components.haeo.core.schema import as_calendar_value, as_entity_value
+from custom_components.haeo.core.schema import as_calendar_value, as_entity_value, is_calendar_value
 from custom_components.haeo.core.schema.field_hints import FieldHint
 from custom_components.haeo.core.state import EntityState, StateMachine
 
@@ -274,7 +274,10 @@ class InputStore:
             return False
 
         if self._source_kind == "calendar":
-            schema_value = as_calendar_value(self._source_entity_ids[0])
+            # Re-read the persisted value so captured events (diagnostics
+            # replay / scenarios) resolve instead of the live entity state.
+            persisted = self._storage.read()
+            schema_value = persisted if is_calendar_value(persisted) else as_calendar_value(self._source_entity_ids[0])
         else:
             schema_value = as_entity_value(self._source_entity_ids)
 
