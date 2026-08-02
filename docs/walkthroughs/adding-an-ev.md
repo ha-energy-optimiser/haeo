@@ -151,7 +151,7 @@ The EV element adds to the existing base system elements (Inverter, Battery, Sol
 - `sensor.commuter_ev_energy_stored` — Current energy in the EV battery (kWh)
 - `sensor.commuter_ev_state_of_charge` — EV battery percentage (%)
 - `sensor.commuter_ev_trip_energy_delivered` — Trip energy delivered so far (kWh)
-- `sensor.commuter_ev_public_charge_power` — Public charging power while away (kW)
+- `sensor.commuter_ev_trip_energy_shortfall` — Trip energy expected to be topped up publicly (kWh)
 
 All sensors include a `forecast` attribute with optimized future values.
 
@@ -161,7 +161,7 @@ With the commute scheduled:
 
 - **Overnight**: HAEO charges the EV during the cheapest electricity periods
 - **Before departure**: The EV reaches sufficient charge for the trip distance
-- **During the trip**: The EV is away; public charging applies only if home charging could not cover the trip
+- **During the trip**: The EV is away; a trip energy shortfall appears only if home charging could not cover the trip
 - **After return**: HAEO resumes home charging based on the remaining schedule
 
 The optimizer balances EV charging against battery storage, solar generation, and grid prices to minimize total system cost.
