@@ -9,6 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from homeassistant.components.frontend import DOMAIN as FRONTEND_DOMAIN
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
@@ -18,6 +19,7 @@ from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.setup import async_when_setup
 
 from custom_components.haeo.const import (
     DOMAIN,
@@ -98,8 +100,16 @@ async def _async_register_static_frontend_resources(hass: HomeAssistant) -> None
     await http.async_register_static_paths(
         [StaticPathConfig(STATIC_CARD_STATIC_PATH, str(static_dir), cache_headers=False)]
     )
-    for url_path in available_bundles:
-        add_extra_js_url(hass, url_path)
+
+    async def _register_card_urls(hass: HomeAssistant, _component: str) -> None:
+        """Register each available card bundle as a Lovelace resource."""
+        for url_path in available_bundles:
+            add_extra_js_url(hass, url_path)
+
+    # add_extra_js_url writes to a registry the frontend component only creates during its
+    # own setup, so calling it here would race with startup ordering. Defer registration
+    # until frontend is up; the callback runs immediately when it already is.
+    async_when_setup(hass, FRONTEND_DOMAIN, _register_card_urls)
 
 
 @dataclass(slots=True)
