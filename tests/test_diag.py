@@ -1,9 +1,12 @@
 """Regression tests for the `uv run diag` CLI.
 
-The diag CLI builds a network straight from `collect_model_elements()`, which is
-easy to leave out of sync with the coordinator's network assembly. These tests
-run the real optimization path over committed scenarios so a missing compilation
-step fails here instead of the next time someone debugs a user report.
+diag assembles its own network instead of going through the coordinator, so it
+has to repeat every step the coordinator performs before adding elements. That
+is easy to leave out of sync, and it silently was: diag omitted
+`compile_policies()`, so every re-solve failed on connections missing their
+tags. These tests run the real optimization path over committed scenarios, so
+the next step that goes missing fails here rather than the next time someone
+debugs a user report.
 """
 
 from pathlib import Path
