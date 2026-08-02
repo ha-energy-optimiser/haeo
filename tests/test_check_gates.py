@@ -53,6 +53,22 @@ def test_every_default_gate_runs_in_ci() -> None:
     assert expected <= invoked, f"gates missing from CI: {sorted(expected - invoked)}"
 
 
+def test_each_gate_runs_in_its_own_job() -> None:
+    """Gates must stay in separate jobs.
+
+    One job per gate is what makes a red check say which gate failed without
+    opening logs, and lets the gates run in parallel across runners. Collapsing
+    them into a single job would pass every other test here.
+    """
+    owners: dict[str, list[str]] = {}
+    for gate, job in gate_invocations().items():
+        owners.setdefault(job, []).append(gate)
+
+    shared = {job: gates for job, gates in owners.items() if len(gates) > 1}
+
+    assert not shared, f"jobs running more than one gate: {shared}"
+
+
 def test_action_only_gates_are_not_invoked_through_the_script() -> None:
     """Gates with no local command must not pretend to run through the runner."""
     invoked = set(gate_invocations())

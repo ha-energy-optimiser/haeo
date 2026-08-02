@@ -25,6 +25,17 @@ When it gains support, delete them.
 There are deliberately no Copilot `applyTo` globs, Cursor rules, or reusable prompt files.
 Those were per-tool formats for the same content; skills replaced all of them.
 
+## Permission grants stay out of the repository
+
+`.claude/settings.json` and `.claude/settings.local.json` are gitignored, and no equivalent for any other agent belongs in version control either.
+
+An allowlist entry for anything that executes project code — `pytest`, `uv run`, the gate runner — is arbitrary code execution for an agent that can also edit that code.
+Committing one silently grants that to everyone who clones the repository, in environments that may not be sandboxed like the author's.
+Whether to pre-approve a command is a per-developer, per-environment trust decision, so leave it to the developer.
+
+Skills may describe what a command does and when to run it.
+They must not try to arrange for it to run without a prompt.
+
 ## How skills load
 
 Agents read only each skill's `name` and `description` at startup, then load the full body when a task matches.
