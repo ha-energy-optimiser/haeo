@@ -2,10 +2,10 @@
 
 Calendar entities in HA expose events with start/end times, summary, location,
 and description fields. This loader extracts a numeric value from each event
-using a configurable field + parser, producing (timestamp, value|None) pairs
-that downstream fusers can align to the optimization horizon.
+using a configurable field + parser, producing ``CalendarWindow`` objects that
+downstream fusers align to the optimization horizon.
 
-Outside of any event window, the value is None — callers decide how to fill
+Outside of any window, fused values are None — callers decide how to fill
 gaps (e.g. 0.0 for availability, hold-last for a schedule, etc.).
 """
 

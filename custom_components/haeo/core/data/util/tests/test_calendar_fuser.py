@@ -364,3 +364,37 @@ def test_fusion_scenarios(
     assert starts == expected_start
     assert ends == expected_end
     assert active == expected_active
+
+
+# --- Windows outside the horizon ---
+
+
+def test_window_after_horizon_is_ignored() -> None:
+    """A window entirely after the horizon must not touch any boundary."""
+    boundaries = _boundaries(0, 1, 2)
+    windows = [_window(5, 6, value=42.0)]
+
+    assert fuse_windows_to_boundaries(windows, boundaries) == [None, None, None]
+    assert fuse_window_edges_to_boundaries(windows, boundaries, "start") == [None, None, None]
+    assert fuse_window_edges_to_boundaries(windows, boundaries, "end") == [None, None, None]
+
+
+def test_window_before_horizon_is_ignored() -> None:
+    """A window entirely before the horizon must not touch any boundary."""
+    boundaries = _boundaries(10, 11, 12)
+    windows = [_window(5, 6, value=42.0)]
+
+    assert fuse_windows_to_boundaries(windows, boundaries) == [None, None, None]
+    assert fuse_window_edges_to_boundaries(windows, boundaries, "start") == [None, None, None]
+    assert fuse_window_edges_to_boundaries(windows, boundaries, "end") == [None, None, None]
+
+
+def test_window_overlapping_horizon_end_is_kept() -> None:
+    """A window straddling the final boundary still marks in-horizon periods."""
+    boundaries = _boundaries(0, 1, 2)
+    windows = [_window(1, 5, value=7.0)]
+
+    assert fuse_windows_to_boundaries(windows, boundaries) == [None, 7.0, 7.0]
+    assert fuse_window_edges_to_boundaries(windows, boundaries, "start") == [None, 7.0, None]
+    # The deadline lies beyond the horizon, so no end edge is placed.
+    assert fuse_window_edges_to_boundaries(windows, boundaries, "end") == [None, None, None]

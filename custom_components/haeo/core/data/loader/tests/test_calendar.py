@@ -500,3 +500,11 @@ def test_load_skips_invalid_event_dicts() -> None:
     events = load_calendar_events(value, FakeStateMachine({}))
     assert len(events) == 1
     assert events[0].summary == "Valid"
+
+
+def test_extract_unit_mismatch_without_converter_skipped() -> None:
+    """A distance in a different unit is skipped when no converter is given."""
+    events = [CalendarEventData(start=_dt(9), end=_dt(10), location="10 mi")]
+    extractor = make_distance_extractor(energy_per_distance=0.2, target_unit="km")
+    windows = extract_calendar_windows(events, extractor)
+    assert len(windows) == 0

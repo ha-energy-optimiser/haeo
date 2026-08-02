@@ -22,8 +22,9 @@ class CalendarValue(TypedDict):
     """Schema value representing calendar-based inputs.
 
     The ``value`` field contains the calendar entity ID.
-    The ``events`` field is populated during loading with the raw event data,
-    so diagnostics capture the exact events the optimizer used.
+    The ``events`` field is None for live configs; diagnostics capture writes
+    the events the optimizer used (via ``capture_calendar_events``) so replay
+    resolves identically without a live calendar entity.
     """
 
     type: Literal["calendar"]

@@ -49,6 +49,9 @@ def fuse_windows_to_boundaries(
     values: list[float | None] = [None] * n_boundaries
 
     for window in windows:
+        if _outside_horizon(window, horizon_times):
+            continue
+
         start_idx = _floor_boundary_index(window.start, horizon_times)
         end_idx = _ceil_boundary_index(window.end, horizon_times)
 
@@ -92,6 +95,9 @@ def fuse_window_edges_to_boundaries(
     values: list[float | None] = [None] * n_boundaries
 
     for window in windows:
+        if _outside_horizon(window, horizon_times):
+            continue
+
         idx = (
             _floor_boundary_index(window.start, horizon_times)
             if edge == "start"
@@ -101,6 +107,15 @@ def fuse_window_edges_to_boundaries(
             _accumulate_value(values, idx, window.value)
 
     return values
+
+
+def _outside_horizon(window: CalendarWindow, horizon_times: Sequence[datetime]) -> bool:
+    """Return True when a window lies entirely outside the horizon.
+
+    Without this guard the clamping in the boundary-index helpers would map
+    windows beyond the horizon end onto the final boundary.
+    """
+    return window.start > horizon_times[-1] or window.end < horizon_times[0]
 
 
 def _accumulate_value(values: list[float | None], index: int, amount: float) -> None:
