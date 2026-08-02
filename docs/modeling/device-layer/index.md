@@ -53,6 +53,9 @@ This prevents naming collisions and groups related components visually in Home A
     Calendar-scheduled energy requirements with priced shortfall.
 
     [:material-arrow-right: Deferrable load modeling](deferrable_load.md)
+- :material-car-electric:{ .lg .middle } **EV**
+    Trip-aware electric vehicle modeling with public charging.
+    [:material-arrow-right: EV modeling](ev.md)
 
 - :material-power-plug:{ .lg .middle } **Grid**
 
