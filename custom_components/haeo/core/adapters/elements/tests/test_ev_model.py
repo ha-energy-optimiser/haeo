@@ -1,0 +1,317 @@
+"""Tests for EV element model mapping and trip optimization behavior."""
+
+from typing import Any
+
+import numpy as np
+import pytest
+
+from custom_components.haeo.core.adapters.elements.ev import (
+    DEFAULT_PUBLIC_CHARGING_PRICE,
+    EV_DEVICE_EV,
+    EV_ENERGY_STORED,
+    EV_POWER_ACTIVE,
+    EV_POWER_CHARGE,
+    EV_POWER_DISCHARGE,
+    EV_PUBLIC_CHARGE_POWER,
+    EV_STATE_OF_CHARGE,
+    EV_TRIP_ENERGY_DELIVERED,
+    adapter,
+)
+from custom_components.haeo.core.data.loader.calendar_resolver import CalendarBoundaryData
+from custom_components.haeo.core.model import Network
+from custom_components.haeo.core.model.elements import MODEL_ELEMENT_TYPE_NODE
+from custom_components.haeo.core.model.elements.battery import BATTERY_ENERGY_STORED
+from custom_components.haeo.core.schema import as_connection_target
+from custom_components.haeo.core.schema.elements import ElementType
+from custom_components.haeo.core.schema.elements.ev import EvConfigData
+
+
+def _boundary_data(
+    presence: list[float],
+    value_edge_start: list[float],
+    value_edge_end: list[float],
+) -> CalendarBoundaryData:
+    """Build calendar boundary data with a derived value_span."""
+    return CalendarBoundaryData(
+        presence=np.array(presence, dtype=np.float64),
+        value_span=np.array(presence, dtype=np.float64),
+        value_edge_start=np.array(value_edge_start, dtype=np.float64),
+        value_edge_end=np.array(value_edge_end, dtype=np.float64),
+    )
+
+
+def _ev_config(**overrides: Any) -> EvConfigData:
+    """Build an EV config with sensible defaults, applying overrides."""
+    config: dict[str, Any] = {
+        "element_type": ElementType.EV,
+        "name": "ev",
+        "connection": as_connection_target("home"),
+        "vehicle": {
+            "capacity": np.array([50.0] * 5),
+            "energy_per_distance": 0.2,
+            "current_soc": 0.10,
+        },
+        "charging": {
+            "max_charge_rate": 10.0,
+        },
+        "power_limits": {},
+        "efficiency": {},
+    }
+    config.update(overrides)
+    return config  # type: ignore[return-value]  # constructed to match EvConfigData
+
+
+def _elements_by_name(config: EvConfigData) -> dict[str, dict[str, Any]]:
+    return {element["name"]: dict(element) for element in adapter.model_elements(config)}
+
+
+# --- model_elements structure ---
+
+
+def test_model_elements_structure() -> None:
+    """The adapter creates the seven expected model elements."""
+    elements = _elements_by_name(_ev_config())
+
+    assert set(elements) == {
+        "ev",
+        "ev:charge",
+        "ev:discharge",
+        "ev:trip",
+        "ev:trip_connection",
+        "ev:public_grid",
+        "ev:public_connection",
+    }
+    assert elements["ev"]["element_type"] == "battery"
+    assert elements["ev"]["initial_charge"] == pytest.approx(5.0)  # SOC ratio 0.10 of 50 kWh
+    assert elements["ev:charge"]["source"] == "home"
+    assert elements["ev:charge"]["target"] == "ev"
+    assert elements["ev:discharge"]["source"] == "ev"
+    assert elements["ev:discharge"]["target"] == "home"
+    assert elements["ev:public_grid"]["is_source"] is True
+    assert elements["ev:public_grid"]["is_sink"] is False
+    assert elements["ev:public_connection"]["source"] == "ev:public_grid"
+    assert elements["ev:public_connection"]["target"] == "ev:trip"
+
+
+def test_no_trip_config_yields_inert_trip_battery() -> None:
+    """Without trip data the trip battery is empty and nothing can flow."""
+    elements = _elements_by_name(_ev_config())
+
+    trip = elements["ev:trip"]
+    assert trip["capacity"] == 0.0
+    assert trip["min_charge"] == 0.0
+    assert trip["initial_charge"] == 0.0
+    assert elements["ev:trip_connection"]["segments"]["power_limit"]["max_power"] == 0.0
+    assert elements["ev:public_connection"]["segments"]["power_limit"]["max_power"] == 0.0
+
+
+def test_default_public_price_applies_when_unconfigured() -> None:
+    """The public connection is always priced, defaulting to the high price."""
+    elements = _elements_by_name(_ev_config())
+
+    price = elements["ev:public_connection"]["segments"]["pricing"]["price"]
+    assert price == DEFAULT_PUBLIC_CHARGING_PRICE
+
+
+def test_configured_public_price_is_used() -> None:
+    """A configured public charging price replaces the default."""
+    elements = _elements_by_name(_ev_config(public_charging={"public_charging_price": 0.6}))
+
+    assert elements["ev:public_connection"]["segments"]["pricing"]["price"] == pytest.approx(0.6)
+
+
+def test_calendar_drives_trip_arrays_and_masks() -> None:
+    """Calendar presence and edges become trip capacity, requirement, and masks."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+            ),
+        },
+    )
+    elements = _elements_by_name(config)
+
+    trip = elements["ev:trip"]
+    np.testing.assert_allclose(trip["capacity"], [0.0, 0.0, 6.0, 6.0, 6.0])  # 30 km * 0.2 kWh/km
+    np.testing.assert_allclose(trip["min_charge"], [0.0, 0.0, 0.0, 6.0, 6.0])
+
+    # Home charging masked off while away (period 2), trip flow open only then.
+    home_charge_limit = elements["ev:charge"]["segments"]["power_limit"]["max_power"]
+    np.testing.assert_allclose(home_charge_limit, [10.0, 10.0, 0.0, 10.0])
+    trip_limit = elements["ev:trip_connection"]["segments"]["power_limit"]["max_power"]
+    np.testing.assert_allclose(np.asarray(trip_limit) > 0, [False, False, True, False])
+
+
+def test_live_connected_sensor_pins_first_interval() -> None:
+    """The live sensor overrides the calendar for the current interval only."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+            ),
+            "connected": 0.0,
+        },
+    )
+    elements = _elements_by_name(config)
+
+    home_charge_limit = elements["ev:charge"]["segments"]["power_limit"]["max_power"]
+    np.testing.assert_allclose(home_charge_limit, [0.0, 10.0, 0.0, 10.0])
+
+
+def test_odometer_progress_reduces_trip_requirement() -> None:
+    """While away, distance already driven becomes trip battery initial charge."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[1.0, 0.0, 0.0, 0.0, 0.0],
+                value_edge_start=[30.0, 0.0, 0.0, 0.0, 0.0],
+                value_edge_end=[0.0, 30.0, 0.0, 0.0, 0.0],
+            ),
+            "connected": 0.0,
+            "odometer": 10_050.0,
+            "odometer_at_disconnect": 10_040.0,
+        },
+    )
+    elements = _elements_by_name(config)
+
+    # 10 km driven * 0.2 kWh/km = 2 kWh already consumed
+    assert elements["ev:trip"]["initial_charge"] == pytest.approx(2.0)
+
+
+def test_odometer_progress_ignored_while_connected() -> None:
+    """Stale odometer readings do not credit the trip battery when home."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+            ),
+            "connected": 1.0,
+            "odometer": 10_050.0,
+            "odometer_at_disconnect": 10_000.0,
+        },
+    )
+    elements = _elements_by_name(config)
+
+    assert elements["ev:trip"]["initial_charge"] == 0.0
+
+
+# --- End-to-end optimization behavior ---
+
+
+def _solve_ev_network(config: EvConfigData, grid_price: list[float]) -> Network:
+    """Build and solve a grid + EV network from the adapter's model elements."""
+    n = len(grid_price)
+    network = Network(name="test", periods=np.array([1.0] * n))
+    network.add({"element_type": MODEL_ELEMENT_TYPE_NODE, "name": "home", "is_source": False, "is_sink": False})
+    network.add({"element_type": MODEL_ELEMENT_TYPE_NODE, "name": "grid", "is_source": True, "is_sink": True})
+    network.add(
+        {
+            "element_type": "connection",
+            "name": "grid:import",
+            "source": "grid",
+            "target": "home",
+            "tags": {1},
+            "segments": {
+                "pricing": {"segment_type": "pricing", "price": np.array(grid_price)},
+            },
+        }
+    )
+
+    # Policy compilation assigns tags in production; default them here.
+    ordered = sorted(adapter.model_elements(config), key=lambda e: e["element_type"] != "node")
+    for element in ordered:
+        if element["element_type"] == "connection":
+            element.setdefault("tags", {1})  # type: ignore[typeddict-unknown-key]  # spec allows tags
+        network.add(element)
+
+    network.optimize()
+    return network
+
+
+def test_optimizer_precharges_before_trip_in_cheap_period() -> None:
+    """The EV charges ahead of the trip when energy is cheapest."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+            ),
+        },
+    )
+    network = _solve_ev_network(config, grid_price=[0.1, 0.5, 0.5, 0.5])
+
+    trip_stored = network.elements["ev:trip"].outputs()[BATTERY_ENERGY_STORED].values
+    assert trip_stored[3] == pytest.approx(6.0, abs=1e-6)
+
+    # The 1 kWh top-up (5 kWh initial vs 6 kWh trip) buys in the cheap period.
+    ev_stored = network.elements["ev"].outputs()[BATTERY_ENERGY_STORED].values
+    assert ev_stored[1] == pytest.approx(6.0, abs=1e-6)
+
+
+def test_public_charging_covers_shortfall() -> None:
+    """When home charging cannot cover the trip, the public grid fills the gap."""
+    config = _ev_config(
+        charging={"max_charge_rate": 2.0},
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 100.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 100.0, 0.0],
+            ),
+        },
+        public_charging={"public_charging_price": 0.8},
+    )
+    # Trip needs 20 kWh; pack holds 5 + at most 4 charged before departure.
+    network = _solve_ev_network(config, grid_price=[0.1, 0.1, 0.1, 0.1])
+
+    trip_stored = network.elements["ev:trip"].outputs()[BATTERY_ENERGY_STORED].values
+    assert trip_stored[3] == pytest.approx(20.0, abs=1e-6)
+
+    public_power = network.elements["ev:public_connection"].outputs()["connection_power"].values
+    assert sum(public_power) > 0.0
+
+
+# --- Outputs mapping ---
+
+
+def test_outputs_mapping_from_solved_network() -> None:
+    """Adapter outputs map solved model values to EV output names."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+            ),
+        },
+    )
+    network = _solve_ev_network(config, grid_price=[0.1, 0.5, 0.5, 0.5])
+    model_outputs = {name: element.outputs() for name, element in network.elements.items()}
+
+    outputs = adapter.outputs("ev", model_outputs, config=config)[EV_DEVICE_EV]
+
+    assert set(outputs) >= {
+        EV_POWER_CHARGE,
+        EV_POWER_DISCHARGE,
+        EV_POWER_ACTIVE,
+        EV_STATE_OF_CHARGE,
+        EV_ENERGY_STORED,
+        EV_TRIP_ENERGY_DELIVERED,
+        EV_PUBLIC_CHARGE_POWER,
+    }
+
+    assert outputs[EV_TRIP_ENERGY_DELIVERED].values[3] == pytest.approx(6.0, abs=1e-6)
+    # SOC is derived from stored energy over pack capacity.
+    assert outputs[EV_STATE_OF_CHARGE].values[0] == pytest.approx(0.10)
+    # Active power is discharge minus charge for every period.
+    np.testing.assert_allclose(
+        outputs[EV_POWER_ACTIVE].values,
+        np.asarray(outputs[EV_POWER_DISCHARGE].values) - np.asarray(outputs[EV_POWER_CHARGE].values),
+    )

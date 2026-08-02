@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry, UnknownSubEntry
-from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower
+from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfLength, UnitOfPower
 from homeassistant.helpers.selector import SelectOptionDict, SelectSelector, SelectSelectorConfig, SelectSelectorMode
 from homeassistant.helpers.translation import async_get_translations
 import voluptuous as vol
@@ -49,8 +49,11 @@ def get_unit_spec_for_output_type(output_type: OutputType) -> UnitSpec | list[Un
             return PRICE_UNIT_SPEC
         case OutputType.PRICE_RATE:
             return None
+        case OutputType.DISTANCE:
+            return UnitOfLength
         case _:
-            # STATUS, COST, DURATION, SHADOW_PRICE - no unit filtering
+            # STATUS, AVAILABILITY, ENERGY_PER_DISTANCE, COST, DURATION,
+            # SHADOW_PRICE - no unit filtering
             return None
 
 
