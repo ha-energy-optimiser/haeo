@@ -74,6 +74,11 @@ describe("seriesIconPath", () => {
     expect(seriesIconPath(series)).toBe(mdiIcons["mdiCarElectricOutline"]);
   });
 
+  it("returns an EV icon for car-named elements", () => {
+    const series = makeSeries({ elementName: "Sports Car", elementType: "load", direction: "+" });
+    expect(seriesIconPath(series)).toBe(mdiIcons["mdiCarElectric"]);
+  });
+
   it("returns a battery icon for battery elements", () => {
     const series = makeSeries({ elementName: "Battery", elementType: "battery", direction: "+" });
     expect(seriesIconPath(series)).toBeTruthy();

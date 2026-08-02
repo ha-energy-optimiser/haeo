@@ -30,7 +30,7 @@ export function seriesIconPath(series: ForecastSeries): string {
   if (series.elementType === "ev" || element.includes("car")) {
     return category.group === "production"
       ? (icons["mdiCarElectric"] ?? fallback)
-      : (icons["mdiCarElectricOutline"] ?? icons["mdiCarElectric"] ?? fallback);
+      : (icons["mdiCarElectricOutline"] ?? fallback);
   }
   if (element.includes("battery")) {
     return category.group === "production"
