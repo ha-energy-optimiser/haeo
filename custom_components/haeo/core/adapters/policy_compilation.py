@@ -39,12 +39,13 @@ from numpy.typing import NDArray
 from custom_components.haeo.core.model.elements import MODEL_ELEMENT_TYPE_CONNECTION, ModelElementConfig
 from custom_components.haeo.core.model.elements.battery import BatteryElementConfig
 from custom_components.haeo.core.model.elements.connection import ConnectionElementConfig
+from custom_components.haeo.core.model.elements.deferrable_load import DeferrableLoadElementConfig
 from custom_components.haeo.core.model.elements.node import NodeElementConfig
 from custom_components.haeo.core.model.elements.policy_pricing import ELEMENT_TYPE as MODEL_ELEMENT_TYPE_POLICY_PRICING
 from custom_components.haeo.core.model.elements.policy_pricing import PolicyPricingElementConfig, PolicyPricingTerm
 
 # Non-connection element configs (nodes and batteries) that can carry tags
-_TaggableConfig = NodeElementConfig | BatteryElementConfig
+_TaggableConfig = NodeElementConfig | BatteryElementConfig | DeferrableLoadElementConfig
 
 # A rule grouping identifies a rule by its source/destination sets,
 # independent of price. Rules with the same grouping share VLAN structure.
