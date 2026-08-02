@@ -9,7 +9,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, add_extra_js_url
+from homeassistant.components.frontend import DOMAIN as FRONTEND_DOMAIN
+from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import Platform
@@ -18,6 +19,7 @@ from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.setup import async_when_setup
 
 from custom_components.haeo.const import (
     DOMAIN,
@@ -99,19 +101,15 @@ async def _async_register_static_frontend_resources(hass: HomeAssistant) -> None
         [StaticPathConfig(STATIC_CARD_STATIC_PATH, str(static_dir), cache_headers=False)]
     )
 
-    # add_extra_js_url stores URLs under hass.data[DATA_EXTRA_MODULE_URL], a key the
-    # frontend component only creates during its own setup. When HAEO is set up first
-    # (startup ordering race) the lookup raises KeyError; skip URL registration like
-    # the HTTP guard above instead of failing the whole integration setup.
-    if DATA_EXTRA_MODULE_URL not in hass.data:
-        _LOGGER.warning(
-            "Frontend module registry not ready during setup (startup ordering race); "
-            "skipping static card URL registration. Optimizer is unaffected."
-        )
-        return
+    async def _register_card_urls(hass: HomeAssistant, _component: str) -> None:
+        """Register each available card bundle as a Lovelace resource."""
+        for url_path in available_bundles:
+            add_extra_js_url(hass, url_path)
 
-    for url_path in available_bundles:
-        add_extra_js_url(hass, url_path)
+    # add_extra_js_url writes to a registry the frontend component only creates during its
+    # own setup, so calling it here would race with startup ordering. Defer registration
+    # until frontend is up; the callback runs immediately when it already is.
+    async_when_setup(hass, FRONTEND_DOMAIN, _register_card_urls)
 
 
 @dataclass(slots=True)
