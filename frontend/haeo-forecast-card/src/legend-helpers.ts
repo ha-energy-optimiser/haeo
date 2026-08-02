@@ -27,6 +27,11 @@ export function seriesIconPath(series: ForecastSeries): string {
       ? (icons["mdiWeatherSunnyAlert"] ?? fallback)
       : (icons["mdiSolarPowerVariant"] ?? icons["mdiWeatherSunny"] ?? fallback);
   }
+  if (element.includes("ev") || element.includes("car")) {
+    return category.group === "production"
+      ? (icons["mdiCarElectric"] ?? fallback)
+      : (icons["mdiCarElectricOutline"] ?? icons["mdiCarElectric"] ?? fallback);
+  }
   if (element.includes("battery")) {
     return category.group === "production"
       ? (icons["mdiBatteryArrowUp"] ?? icons["mdiBatteryPlus"] ?? fallback)
