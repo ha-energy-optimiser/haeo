@@ -18,7 +18,7 @@ An EV in HAEO represents:
 - **Energy storage** with a battery capacity (kWh+)
 - **Charge and discharge rates** for home charging (kW)
 - **Trip calendar** from a Home Assistant calendar entity with distance in the location field
-- **Connected sensor** indicating when the vehicle is plugged in at home
+- **Plugged in sensor** indicating when the vehicle is connected to your home charger
 - **Odometer sensors** for mid-trip energy tracking
 - **Optional public charging price** for modeling away-from-home charging costs
 
@@ -36,7 +36,7 @@ Fields configured with "Constant" create input entities that you can adjust at r
 | **[Name](#name)**                                        | String     | Yes      | -       | Unique identifier (e.g., "Tesla Model 3")        |
 | **[Connection](#connection)**                            | Select     | Yes      | -       | Node to connect to in your energy network        |
 | **[Trip calendar](#trip-calendar)**                      | Entity     | No       | -       | Calendar entity with trip events                 |
-| **[Connected sensor](#connected-sensor)**                | Entity     | No       | -       | Binary sensor reporting when plugged in          |
+| **[Plugged in](#plugged-in)**                            | Entity     | No       | 1       | Binary sensor reporting when plugged in          |
 | **[Odometer](#odometer)**                                | Entity     | No       | -       | Sensor reporting current odometer reading        |
 | **[Odometer at disconnect](#odometer-at-disconnect)**    | Entity     | No       | -       | Sensor reporting odometer when last disconnected |
 | **[Reserve state of charge](#reserve)**                  | Percentage | No       | -       | Buffer to keep in the pack while away            |
@@ -49,8 +49,8 @@ Fields configured with "Constant" create input entities that you can adjust at r
 | **[Public charging price](#public-charging-price)**      | Price      | No       | -       | Cost per kWh for public charging                 |
 | **[Max charge power](#power-limits)**                    | Power      | No       | -       | Overall max charge power limit                   |
 | **[Max discharge power](#power-limits)**                 | Power      | No       | -       | Overall max discharge power limit                |
-| **[Charge efficiency](#efficiency)**                     | Percentage | No       | -       | Efficiency when charging                         |
-| **[Discharge efficiency](#efficiency)**                  | Percentage | No       | -       | Efficiency when discharging                      |
+| **[Charge efficiency](#efficiency)**                     | Percentage | No       | 95%     | Efficiency when charging                         |
+| **[Discharge efficiency](#efficiency)**                  | Percentage | No       | 95%     | Efficiency when discharging                      |
 
 ### Name
 
@@ -78,9 +78,10 @@ Events whose text contains no parsable distance are ignored entirely.
     The distance is read from the first of the location, summary, or description fields that contains a number followed by a unit.
     Supported units include `km`, `mi`, `miles`, `m`, and `meters`; all distances are normalized to kilometres.
 
-### Connected sensor
+### Plugged in
 
 Select a binary sensor that reports `on` when the EV is plugged in at home and `off` when disconnected.
+As a constant, `1` means always plugged in and `0` means never — without a sensor or calendar the default of `1` treats the car as permanently home.
 The trip calendar is authoritative for future availability; this sensor pins the *current* state, so an early return or unplanned absence is reflected immediately.
 
 ### Odometer
@@ -159,6 +160,14 @@ The EV element creates one device with the following sensors:
 | Charge power    | kW   | Current charging power         |
 | Discharge power | kW   | Current discharging power      |
 | Active power    | kW   | Net power (discharge − charge) |
+
+!!! note "Charge power is measured on the network side"
+
+    The max charge rate limits energy delivered into the battery, after charge
+    efficiency losses. The charge power sensor reports power drawn from your
+    home network, so with 95% efficiency a 7.4 kW limit shows as up to
+    7.79 kW at the wall. Account for this when driving a charger from this
+    sensor.
 
 ### Energy sensors
 
