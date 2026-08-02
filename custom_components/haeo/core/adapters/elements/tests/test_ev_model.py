@@ -12,8 +12,8 @@ from custom_components.haeo.core.adapters.elements.ev import (
     EV_POWER_ACTIVE,
     EV_POWER_CHARGE,
     EV_POWER_DISCHARGE,
-    EV_PUBLIC_CHARGE_POWER,
     EV_STATE_OF_CHARGE,
+    EV_TRIP_ENERGY_DEFICIT,
     EV_TRIP_ENERGY_DELIVERED,
     adapter,
 )
@@ -21,6 +21,10 @@ from custom_components.haeo.core.data.loader.calendar_resolver import CalendarBo
 from custom_components.haeo.core.model import Network
 from custom_components.haeo.core.model.elements import MODEL_ELEMENT_TYPE_NODE
 from custom_components.haeo.core.model.elements.battery import BATTERY_ENERGY_STORED
+from custom_components.haeo.core.model.elements.deferrable_load import (
+    DEFERRABLE_LOAD_ENERGY_ABSORBED,
+    DEFERRABLE_LOAD_ENERGY_DEFICIT,
+)
 from custom_components.haeo.core.schema import as_connection_target
 from custom_components.haeo.core.schema.elements import ElementType
 from custom_components.haeo.core.schema.elements.ev import EvConfigData
@@ -69,7 +73,7 @@ def _elements_by_name(config: EvConfigData) -> dict[str, dict[str, Any]]:
 
 
 def test_model_elements_structure() -> None:
-    """The adapter creates the seven expected model elements."""
+    """The adapter creates the five expected model elements."""
     elements = _elements_by_name(_ev_config())
 
     assert set(elements) == {
@@ -78,8 +82,6 @@ def test_model_elements_structure() -> None:
         "ev:discharge",
         "ev:trip",
         "ev:trip_connection",
-        "ev:public_grid",
-        "ev:public_connection",
     }
     assert elements["ev"]["element_type"] == "battery"
     assert elements["ev"]["initial_charge"] == pytest.approx(5.0)  # SOC ratio 0.10 of 50 kWh
@@ -87,37 +89,34 @@ def test_model_elements_structure() -> None:
     assert elements["ev:charge"]["target"] == "ev"
     assert elements["ev:discharge"]["source"] == "ev"
     assert elements["ev:discharge"]["target"] == "home"
-    assert elements["ev:public_grid"]["is_source"] is True
-    assert elements["ev:public_grid"]["is_sink"] is False
-    assert elements["ev:public_connection"]["source"] == "ev:public_grid"
-    assert elements["ev:public_connection"]["target"] == "ev:trip"
+    assert elements["ev:trip"]["element_type"] == "deferrable_load"
+    assert elements["ev:trip_connection"]["source"] == "ev"
+    assert elements["ev:trip_connection"]["target"] == "ev:trip"
 
 
-def test_no_trip_config_yields_inert_trip_battery() -> None:
-    """Without trip data the trip battery is empty and nothing can flow."""
+def test_no_trip_config_yields_inert_trip_load() -> None:
+    """Without trip data the trip load requires nothing and nothing can flow."""
     elements = _elements_by_name(_ev_config())
 
     trip = elements["ev:trip"]
     assert trip["capacity"] == 0.0
-    assert trip["min_charge"] == 0.0
-    assert trip["initial_charge"] == 0.0
+    assert trip["required"] == 0.0
+    assert trip["initial_energy"] == 0.0
     assert elements["ev:trip_connection"]["segments"]["power_limit"]["max_power"] == 0.0
-    assert elements["ev:public_connection"]["segments"]["power_limit"]["max_power"] == 0.0
 
 
 def test_default_public_price_applies_when_unconfigured() -> None:
-    """The public connection is always priced, defaulting to the high price."""
+    """The trip deficit is always priced, defaulting to the high price."""
     elements = _elements_by_name(_ev_config())
 
-    price = elements["ev:public_connection"]["segments"]["pricing"]["price"]
-    assert price == DEFAULT_PUBLIC_CHARGING_PRICE
+    assert elements["ev:trip"]["deficit_price"] == DEFAULT_PUBLIC_CHARGING_PRICE
 
 
 def test_configured_public_price_is_used() -> None:
-    """A configured public charging price replaces the default."""
+    """A configured public charging price becomes the deficit price."""
     elements = _elements_by_name(_ev_config(public_charging={"public_charging_price": 0.6}))
 
-    assert elements["ev:public_connection"]["segments"]["pricing"]["price"] == pytest.approx(0.6)
+    assert elements["ev:trip"]["deficit_price"] == pytest.approx(0.6)
 
 
 def test_calendar_drives_trip_arrays_and_masks() -> None:
@@ -135,7 +134,7 @@ def test_calendar_drives_trip_arrays_and_masks() -> None:
 
     trip = elements["ev:trip"]
     np.testing.assert_allclose(trip["capacity"], [0.0, 0.0, 6.0, 6.0, 6.0])  # 30 km * 0.2 kWh/km
-    np.testing.assert_allclose(trip["min_charge"], [0.0, 0.0, 0.0, 6.0, 6.0])
+    np.testing.assert_allclose(trip["required"], [0.0, 0.0, 0.0, 6.0, 6.0])
 
     # Home charging masked off while away (period 2), trip flow open only then.
     home_charge_limit = elements["ev:charge"]["segments"]["power_limit"]["max_power"]
@@ -179,7 +178,7 @@ def test_odometer_progress_reduces_trip_requirement() -> None:
     elements = _elements_by_name(config)
 
     # 10 km driven * 0.2 kWh/km = 2 kWh already consumed
-    assert elements["ev:trip"]["initial_charge"] == pytest.approx(2.0)
+    assert elements["ev:trip"]["initial_energy"] == pytest.approx(2.0)
 
 
 def test_odometer_progress_ignored_while_connected() -> None:
@@ -198,7 +197,7 @@ def test_odometer_progress_ignored_while_connected() -> None:
     )
     elements = _elements_by_name(config)
 
-    assert elements["ev:trip"]["initial_charge"] == 0.0
+    assert elements["ev:trip"]["initial_energy"] == 0.0
 
 
 # --- End-to-end optimization behavior ---
@@ -247,16 +246,16 @@ def test_optimizer_precharges_before_trip_in_cheap_period() -> None:
     )
     network = _solve_ev_network(config, grid_price=[0.1, 0.5, 0.5, 0.5])
 
-    trip_stored = network.elements["ev:trip"].outputs()[BATTERY_ENERGY_STORED].values
-    assert trip_stored[3] == pytest.approx(6.0, abs=1e-6)
+    trip_absorbed = network.elements["ev:trip"].outputs()[DEFERRABLE_LOAD_ENERGY_ABSORBED].values
+    assert trip_absorbed[3] == pytest.approx(6.0, abs=1e-6)
 
     # The 1 kWh top-up (5 kWh initial vs 6 kWh trip) buys in the cheap period.
     ev_stored = network.elements["ev"].outputs()[BATTERY_ENERGY_STORED].values
     assert ev_stored[1] == pytest.approx(6.0, abs=1e-6)
 
 
-def test_public_charging_covers_shortfall() -> None:
-    """When home charging cannot cover the trip, the public grid fills the gap."""
+def test_shortfall_becomes_priced_deficit() -> None:
+    """When home charging cannot cover the trip, the shortfall is priced."""
     config = _ev_config(
         charging={"max_charge_rate": 2.0},
         trip={
@@ -271,11 +270,11 @@ def test_public_charging_covers_shortfall() -> None:
     # Trip needs 20 kWh; pack holds 5 + at most 4 charged before departure.
     network = _solve_ev_network(config, grid_price=[0.1, 0.1, 0.1, 0.1])
 
-    trip_stored = network.elements["ev:trip"].outputs()[BATTERY_ENERGY_STORED].values
-    assert trip_stored[3] == pytest.approx(20.0, abs=1e-6)
-
-    public_power = network.elements["ev:public_connection"].outputs()["connection_power"].values
-    assert sum(public_power) > 0.0
+    trip_outputs = network.elements["ev:trip"].outputs()
+    absorbed = trip_outputs[DEFERRABLE_LOAD_ENERGY_ABSORBED].values
+    deficit = trip_outputs[DEFERRABLE_LOAD_ENERGY_DEFICIT].values
+    assert absorbed[3] == pytest.approx(9.0, abs=1e-6)
+    assert deficit[-1] == pytest.approx(11.0, abs=1e-6)
 
 
 # --- Outputs mapping ---
@@ -304,10 +303,11 @@ def test_outputs_mapping_from_solved_network() -> None:
         EV_STATE_OF_CHARGE,
         EV_ENERGY_STORED,
         EV_TRIP_ENERGY_DELIVERED,
-        EV_PUBLIC_CHARGE_POWER,
+        EV_TRIP_ENERGY_DEFICIT,
     }
 
     assert outputs[EV_TRIP_ENERGY_DELIVERED].values[3] == pytest.approx(6.0, abs=1e-6)
+    assert outputs[EV_TRIP_ENERGY_DEFICIT].values[-1] == pytest.approx(0.0, abs=1e-6)
     # SOC is derived from stored energy over pack capacity.
     assert outputs[EV_STATE_OF_CHARGE].values[0] == pytest.approx(0.10)
     # Active power is discharge minus charge for every period.

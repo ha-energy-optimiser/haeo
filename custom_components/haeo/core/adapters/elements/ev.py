@@ -16,9 +16,13 @@ from custom_components.haeo.core.model.const import OutputType
 from custom_components.haeo.core.model.elements import (
     MODEL_ELEMENT_TYPE_BATTERY,
     MODEL_ELEMENT_TYPE_CONNECTION,
-    MODEL_ELEMENT_TYPE_NODE,
+    MODEL_ELEMENT_TYPE_DEFERRABLE_LOAD,
 )
 from custom_components.haeo.core.model.elements.connection import CONNECTION_SEGMENTS
+from custom_components.haeo.core.model.elements.deferrable_load import (
+    DEFERRABLE_LOAD_ENERGY_ABSORBED,
+    DEFERRABLE_LOAD_ENERGY_DEFICIT,
+)
 from custom_components.haeo.core.model.output_data import OutputData
 from custom_components.haeo.core.schema import extract_connection_target
 from custom_components.haeo.core.schema.elements import ElementType
@@ -70,7 +74,7 @@ type EvOutputName = Literal[
     "ev_state_of_charge",
     "ev_energy_stored",
     "ev_trip_energy_delivered",
-    "ev_public_charge_power",
+    "ev_trip_energy_deficit",
     "ev_power_max_charge_price",
     "ev_power_max_discharge_price",
 ]
@@ -83,7 +87,7 @@ EV_OUTPUT_NAMES: Final[frozenset[EvOutputName]] = frozenset(
         EV_STATE_OF_CHARGE := "ev_state_of_charge",
         EV_ENERGY_STORED := "ev_energy_stored",
         EV_TRIP_ENERGY_DELIVERED := "ev_trip_energy_delivered",
-        EV_PUBLIC_CHARGE_POWER := "ev_public_charge_power",
+        EV_TRIP_ENERGY_DEFICIT := "ev_trip_energy_deficit",
         EV_POWER_MAX_CHARGE_PRICE := "ev_power_max_charge_price",
         EV_POWER_MAX_DISCHARGE_PRICE := "ev_power_max_discharge_price",
     )
@@ -108,19 +112,19 @@ class EvAdapter:
     def model_elements(self, config: EvConfigData) -> list[ModelElementConfig]:
         """Create model elements for EV configuration.
 
-        Creates 7 model elements:
+        Creates 5 model elements:
         1. {name} - Battery (EV battery)
         2. {name}:charge - Connection (network → EV, home charging)
         3. {name}:discharge - Connection (EV → network, V2G)
-        4. {name}:trip - Battery (trip energy sink with min-charge requirement)
-        5. {name}:trip_connection - Connection (EV → trip battery, away only)
-        6. {name}:public_grid - Node (public charging source)
-        7. {name}:public_connection - Connection (public grid → trip battery, priced)
+        4. {name}:trip - Deferrable load (trip energy requirement)
+        5. {name}:trip_connection - Connection (EV → trip load, away only)
 
         Trip windows come from the trip calendar: while away the home
         connections are masked off and trip energy (distance times consumption)
-        must be delivered into the trip battery by each trip's end — from
-        the EV pack or from the public grid at the public charging price.
+        is due into the trip load by each trip's end. The requirement is not
+        hard — any shortfall is priced at the public charging price, which
+        models topping up publicly during the trip and keeps the optimization
+        feasible when home charging cannot cover the trip in time.
         """
         name = config["name"]
         vehicle = config[SECTION_VEHICLE]
@@ -209,16 +213,19 @@ class EvAdapter:
                     },
                 },
             },
-            # 4. Trip battery (energy sink for trip consumption)
+            # 4. Trip requirement as a deferrable load: capacity opens at
+            # each trip's start, the requirement is due by its end, and any
+            # locked-in shortfall is priced at the public charging price —
+            # the energy that would have to be bought publicly mid-trip.
             {
-                "element_type": MODEL_ELEMENT_TYPE_BATTERY,
+                "element_type": MODEL_ELEMENT_TYPE_DEFERRABLE_LOAD,
                 "name": f"{name}:trip",
                 "capacity": trip_capacity,
-                "initial_charge": trip_initial,
-                "min_charge": trip_required,
-                "salvage_value": 0.0,
+                "required": trip_required,
+                "initial_energy": trip_initial,
+                "deficit_price": _public_price(config),
             },
-            # 5. Trip connection: EV → trip battery. Driving power is not
+            # 5. Trip connection: EV → trip load. Driving power is not
             # limited by the charger, only by being away.
             {
                 "element_type": MODEL_ELEMENT_TYPE_CONNECTION,
@@ -229,33 +236,6 @@ class EvAdapter:
                     "power_limit": {
                         "segment_type": "power_limit",
                         "max_power": _mask_or_zero(away_flag, _UNLIMITED_POWER),
-                    },
-                },
-            },
-            # 6. Public charging grid (source-only node)
-            {
-                "element_type": MODEL_ELEMENT_TYPE_NODE,
-                "name": f"{name}:public_grid",
-                "is_source": True,
-                "is_sink": False,
-            },
-            # 7. Public charging: public grid → trip battery. Always present
-            # and always priced: it is the relief valve that keeps the trip
-            # requirement feasible when home charging cannot cover it.
-            {
-                "element_type": MODEL_ELEMENT_TYPE_CONNECTION,
-                "name": f"{name}:public_connection",
-                "source": f"{name}:public_grid",
-                "target": f"{name}:trip",
-                "is_external": True,
-                "segments": {
-                    "power_limit": {
-                        "segment_type": "power_limit",
-                        "max_power": _mask_or_zero(away_flag, _UNLIMITED_POWER),
-                    },
-                    "pricing": {
-                        "segment_type": "pricing",
-                        "price": _public_price(config),
                     },
                 },
             },
@@ -310,16 +290,12 @@ class EvAdapter:
             direction=None,
         )
 
-        # Trip energy delivered so far (trip battery energy stored)
-        trip_energy = expect_output_data(trip_outputs[model_battery.BATTERY_ENERGY_STORED])
+        # Trip energy delivered so far and the locked-in shortfall the
+        # optimizer expects to cover with public charging.
+        trip_energy = expect_output_data(trip_outputs[DEFERRABLE_LOAD_ENERGY_ABSORBED])
         ev_outputs[EV_TRIP_ENERGY_DELIVERED] = replace(trip_energy, type=OutputType.ENERGY)
-
-        # Public charging power
-        pub_connection = model_outputs.get(f"{name}:public_connection")
-        if pub_connection is not None:
-            ev_outputs[EV_PUBLIC_CHARGE_POWER] = replace(
-                connection_power(pub_connection, period_count), type=OutputType.POWER
-            )
+        trip_deficit = expect_output_data(trip_outputs[DEFERRABLE_LOAD_ENERGY_DEFICIT])
+        ev_outputs[EV_TRIP_ENERGY_DEFICIT] = replace(trip_deficit, type=OutputType.ENERGY)
 
         # Shadow prices for the home charge/discharge power limits
         shadow_mappings: tuple[tuple[EvOutputName, Mapping[ModelOutputName, ModelOutputValue] | None], ...] = (
