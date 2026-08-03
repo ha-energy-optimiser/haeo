@@ -85,6 +85,7 @@ Explore detailed configuration for each element type:
     Scheduled loads that must absorb set energy within calendar windows.
 
     [:material-arrow-right: Deferrable load guide](deferrable_load.md)
+
 - :material-car-electric:{ .lg .middle } __EV configuration__
     Electric vehicle with calendar-driven trip planning and V2G.
     [:material-arrow-right: EV guide](ev.md)

@@ -72,6 +72,22 @@ $$
 
 This models topping up publicly during the trip: the optimizer covers trip energy from the EV pack whenever home charging is cheaper than the public price, and a trip can never make the optimization infeasible.
 
+Live telemetry is tolerated by construction: the trip load's effective capacity never sits below the energy already absorbed, and an initial overshoot (a car that drove further than forecast) is neither infeasible nor priced as overage.
+The pack's initial charge clamps to $[0, C]$ so a glitched state-of-charge sensor cannot overfill the model.
+
+### Reserve demand pricing
+
+An optional reserve keeps a buffer in the pack while away.
+Because the home connections are masked off during trips, the pack can only drain while away — so the lowest level hit during a trip window equals the level at the window's end.
+The reserve is therefore priced with one check per trip end boundary $e$:
+
+$$
+\text{cost} = \sum_{e} p_{\text{reserve}}(e) \cdot \max\left(0,\ E_{\text{reserve}} - E_{\text{pack}}(e)\right)
+$$
+
+This is demand-level pricing: the charge is on the depth of each trip's dip below the reserve, not integrated over time spent below it.
+The price defaults to the public charging price.
+
 ### Mid-trip energy tracking
 
 When the car is mid-trip and the odometer updates, HAEO reduces the remaining trip energy requirement:

@@ -39,6 +39,8 @@ Fields configured with "Constant" create input entities that you can adjust at r
 | **[Connected sensor](#connected-sensor)**                | Entity     | No       | -       | Binary sensor reporting when plugged in          |
 | **[Odometer](#odometer)**                                | Entity     | No       | -       | Sensor reporting current odometer reading        |
 | **[Odometer at disconnect](#odometer-at-disconnect)**    | Entity     | No       | -       | Sensor reporting odometer when last disconnected |
+| **[Reserve state of charge](#reserve)**                  | Percentage | No       | -       | Buffer to keep in the pack while away            |
+| **[Reserve shortfall price](#reserve)**                  | Price      | No       | -       | Cost per kWh of dipping below the reserve        |
 | **[Battery capacity](#battery-capacity)**                | Energy     | Yes      | -       | Total usable battery capacity                    |
 | **[Energy per distance](#energy-per-distance)**          | Ratio      | Yes      | -       | Energy consumption rate (kWh/km)                 |
 | **[Current state of charge](#current-state-of-charge)**  | Percentage | Yes      | -       | Sensor reporting current SOC (0–100%)            |
@@ -95,6 +97,17 @@ Combined with the current odometer, this lets HAEO calculate energy already cons
 
     If the odometer does not update while driving (some vehicles only update when parked or connected), HAEO conservatively assumes no progress has been made.
     The full trip energy remains reserved until the odometer updates.
+
+### Reserve
+
+Optionally keep a buffer in the pack while the car is away, so an unplanned detour does not leave you stranded.
+The reserve is priced like a demand charge: for each trip, the cost is on the **lowest battery level hit during the trip window**, not on every interval spent below the reserve.
+Dropping 5 kWh below the reserve for one hour or for the whole trip costs the same — one charge per trip on the depth of the dip.
+
+- **Reserve state of charge**: the buffer as a percentage of battery capacity (e.g. 20%)
+- **Reserve shortfall price**: the cost per kWh of dipping below the reserve; when unset, the public charging price applies (the cost of restoring the buffer away from home)
+
+When configured, a **Reserve shortfall** sensor shows the expected dip below the reserve for each trip.
 
 ### Battery capacity
 
