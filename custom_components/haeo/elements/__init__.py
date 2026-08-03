@@ -72,6 +72,7 @@ from custom_components.haeo.core.adapters.elements.deferrable_load import (
     DEFERRABLE_LOAD_ELEMENT_OUTPUT_NAMES,
     DeferrableLoadDeviceName,
     DeferrableLoadElementOutputName,
+)
 from custom_components.haeo.core.adapters.elements.ev import (
     EV_DEVICE_NAMES,
     EV_OUTPUT_NAMES,

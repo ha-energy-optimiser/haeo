@@ -45,6 +45,8 @@ CONF_CONNECTED: Final = "connected"
 CONF_TRIP_CALENDAR: Final = "trip_calendar"
 CONF_ODOMETER: Final = "odometer"
 CONF_ODOMETER_AT_DISCONNECT: Final = "odometer_at_disconnect"
+CONF_RESERVE_SOC: Final = "reserve_soc"
+CONF_RESERVE_PRICE: Final = "reserve_price"
 
 # Public charging section field names
 CONF_PUBLIC_CHARGING_PRICE: Final = "public_charging_price"
@@ -55,6 +57,8 @@ OPTIONAL_INPUT_FIELDS: Final[frozenset[str]] = frozenset(
         CONF_TRIP_CALENDAR,
         CONF_ODOMETER,
         CONF_ODOMETER_AT_DISCONNECT,
+        CONF_RESERVE_SOC,
+        CONF_RESERVE_PRICE,
         CONF_MAX_DISCHARGE_RATE,
         CONF_MAX_POWER_SOURCE_TARGET,
         CONF_MAX_POWER_TARGET_SOURCE,
@@ -116,6 +120,8 @@ class TripConfig(TypedDict, total=False):
     connected: EntityValue | ConstantValue | NoneValue
     odometer: EntityValue | NoneValue
     odometer_at_disconnect: EntityValue | NoneValue
+    reserve_soc: EntityValue | ConstantValue | NoneValue
+    reserve_price: EntityValue | ConstantValue | NoneValue
 
 
 class TripData(TypedDict, total=False):
@@ -125,6 +131,8 @@ class TripData(TypedDict, total=False):
     connected: NDArray[np.floating[Any]] | float
     odometer: float
     odometer_at_disconnect: float
+    reserve_soc: float
+    reserve_price: NDArray[np.floating[Any]] | float
 
 
 # --- Public charging section ---
@@ -214,6 +222,15 @@ class EvConfigSchema(ConnectedCommonConfig):
                         output_type=OutputType.DISTANCE,
                         time_series=False,
                     ),
+                    CONF_RESERVE_SOC: FieldHint(
+                        output_type=OutputType.STATE_OF_CHARGE,
+                        time_series=False,
+                        step=1.0,
+                    ),
+                    CONF_RESERVE_PRICE: FieldHint(
+                        output_type=OutputType.PRICE,
+                        time_series=True,
+                    ),
                 }
             ),
         ]
@@ -291,6 +308,8 @@ __all__ = [
     "CONF_ODOMETER",
     "CONF_ODOMETER_AT_DISCONNECT",
     "CONF_PUBLIC_CHARGING_PRICE",
+    "CONF_RESERVE_PRICE",
+    "CONF_RESERVE_SOC",
     "CONF_TRIP_CALENDAR",
     "ELEMENT_TYPE",
     "OPTIONAL_INPUT_FIELDS",

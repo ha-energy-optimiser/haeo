@@ -12,6 +12,7 @@ from custom_components.haeo.core.adapters.elements.ev import (
     EV_POWER_ACTIVE,
     EV_POWER_CHARGE,
     EV_POWER_DISCHARGE,
+    EV_RESERVE_SHORTFALL,
     EV_STATE_OF_CHARGE,
     EV_TRIP_ENERGY_DEFICIT,
     EV_TRIP_ENERGY_DELIVERED,
@@ -315,3 +316,119 @@ def test_outputs_mapping_from_solved_network() -> None:
         outputs[EV_POWER_ACTIVE].values,
         np.asarray(outputs[EV_POWER_DISCHARGE].values) - np.asarray(outputs[EV_POWER_CHARGE].values),
     )
+
+
+# --- Telemetry robustness ---
+
+
+def test_odometer_overshoot_beyond_trip_stays_feasible() -> None:
+    """A car that drove further than the scheduled trip must still solve."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[1.0, 0.0, 0.0, 0.0, 0.0],
+                value_edge_start=[30.0, 0.0, 0.0, 0.0, 0.0],
+                value_edge_end=[0.0, 30.0, 0.0, 0.0, 0.0],
+            ),
+            "connected": 0.0,
+            "odometer": 10_100.0,
+            "odometer_at_disconnect": 10_000.0,  # 100 km driven on a 30 km trip
+        },
+    )
+    elements = _elements_by_name(config)
+    assert elements["ev:trip"]["initial_energy"] == pytest.approx(20.0)  # unclamped
+
+    network = _solve_ev_network(config, grid_price=[0.1, 0.1, 0.1, 0.1])
+
+    trip_outputs = network.elements["ev:trip"].outputs()
+    assert trip_outputs[DEFERRABLE_LOAD_ENERGY_DEFICIT].values[-1] == pytest.approx(0.0)
+
+
+def test_glitched_soc_sensor_is_clamped() -> None:
+    """A SOC reading above 100% cannot make the pack overfull."""
+    config = _ev_config()
+    config["vehicle"]["current_soc"] = 2.5  # 250% from a glitched sensor
+
+    elements = _elements_by_name(config)
+
+    assert elements["ev"]["initial_charge"] == pytest.approx(50.0)  # clamped to capacity
+
+
+# --- Reserve demand pricing ---
+
+
+def _reserve_trip(**extra: Any) -> dict[str, Any]:
+    """Trip config with a calendar and a 20% reserve."""
+    return {
+        "trip_calendar": _boundary_data(
+            presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+            value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+            value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+        ),
+        "reserve_soc": 0.2,
+        **extra,
+    }
+
+
+def test_reserve_config_masks_trip_window_ends() -> None:
+    """The reserve applies at trip end boundaries with the pack-scaled level."""
+    config = _ev_config(trip=_reserve_trip(reserve_price=0.5))
+    elements = _elements_by_name(config)
+
+    battery = elements["ev"]
+    np.testing.assert_allclose(battery["reserve_level"], [10.0] * 5)  # 20% of 50 kWh
+    np.testing.assert_allclose(battery["reserve_mask"], [0.0, 0.0, 0.0, 1.0, 0.0])
+    assert battery["reserve_price"] == pytest.approx(0.5)
+
+
+def test_reserve_price_defaults_to_public_price() -> None:
+    """Without an explicit price the public charging price applies."""
+    config = _ev_config(trip=_reserve_trip(), public_charging={"public_charging_price": 0.7})
+    elements = _elements_by_name(config)
+
+    assert elements["ev"]["reserve_price"] == pytest.approx(0.7)
+
+
+def test_reserve_drives_extra_precharge() -> None:
+    """With a reserve, the optimizer charges for the trip plus the buffer."""
+    config = _ev_config(trip=_reserve_trip(reserve_price=2.0))
+    network = _solve_ev_network(config, grid_price=[0.1, 0.5, 0.5, 0.5])
+
+    # Pack ends the trip at the 10 kWh reserve instead of 0.
+    ev_stored = network.elements["ev"].outputs()[BATTERY_ENERGY_STORED].values
+    assert ev_stored[3] == pytest.approx(10.0, abs=1e-6)
+
+    outputs = adapter.outputs("ev", {n: e.outputs() for n, e in network.elements.items()}, config=config)[EV_DEVICE_EV]
+    assert outputs[EV_RESERVE_SHORTFALL].values[3] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_reserve_shortfall_reported_when_unavoidable() -> None:
+    """When the buffer cannot be met, the shortfall sensor reports the dip."""
+    config = _ev_config(
+        charging={"max_charge_rate": 0.5},  # can only add 1 kWh before departure
+        trip=_reserve_trip(reserve_price=0.01),
+        public_charging={"public_charging_price": 10.0},
+    )
+    network = _solve_ev_network(config, grid_price=[0.1, 0.1, 0.1, 0.1])
+
+    outputs = adapter.outputs("ev", {n: e.outputs() for n, e in network.elements.items()}, config=config)[EV_DEVICE_EV]
+    # Pack holds at most 6 kWh at departure; the trip drains it toward zero,
+    # so the 10 kWh reserve is missed at the trip end boundary.
+    assert outputs[EV_RESERVE_SHORTFALL].values[3] > 0.0
+
+
+def test_no_reserve_means_no_reserve_output() -> None:
+    """Without reserve configuration the EV exposes no reserve sensor."""
+    config = _ev_config(
+        trip={
+            "trip_calendar": _boundary_data(
+                presence=[0.0, 0.0, 1.0, 0.0, 0.0],
+                value_edge_start=[0.0, 0.0, 30.0, 0.0, 0.0],
+                value_edge_end=[0.0, 0.0, 0.0, 30.0, 0.0],
+            ),
+        },
+    )
+    network = _solve_ev_network(config, grid_price=[0.1, 0.5, 0.5, 0.5])
+
+    outputs = adapter.outputs("ev", {n: e.outputs() for n, e in network.elements.items()}, config=config)[EV_DEVICE_EV]
+    assert EV_RESERVE_SHORTFALL not in outputs

@@ -1,7 +1,7 @@
 """EV element adapter for model layer integration."""
 
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, Final, Literal
 
 import numpy as np
@@ -18,6 +18,7 @@ from custom_components.haeo.core.model.elements import (
     MODEL_ELEMENT_TYPE_CONNECTION,
     MODEL_ELEMENT_TYPE_DEFERRABLE_LOAD,
 )
+from custom_components.haeo.core.model.elements.battery import BATTERY_RESERVE_SHORTFALL, BatteryElementConfig
 from custom_components.haeo.core.model.elements.connection import CONNECTION_SEGMENTS
 from custom_components.haeo.core.model.elements.deferrable_load import (
     DEFERRABLE_LOAD_ENERGY_ABSORBED,
@@ -36,6 +37,8 @@ from custom_components.haeo.core.schema.elements.ev import (
     CONF_ODOMETER,
     CONF_ODOMETER_AT_DISCONNECT,
     CONF_PUBLIC_CHARGING_PRICE,
+    CONF_RESERVE_PRICE,
+    CONF_RESERVE_SOC,
     CONF_TRIP_CALENDAR,
     ELEMENT_TYPE,
     SECTION_CHARGING,
@@ -75,6 +78,7 @@ type EvOutputName = Literal[
     "ev_energy_stored",
     "ev_trip_energy_delivered",
     "ev_trip_energy_deficit",
+    "ev_reserve_shortfall",
     "ev_power_max_charge_price",
     "ev_power_max_discharge_price",
 ]
@@ -88,6 +92,7 @@ EV_OUTPUT_NAMES: Final[frozenset[EvOutputName]] = frozenset(
         EV_ENERGY_STORED := "ev_energy_stored",
         EV_TRIP_ENERGY_DELIVERED := "ev_trip_energy_delivered",
         EV_TRIP_ENERGY_DEFICIT := "ev_trip_energy_deficit",
+        EV_RESERVE_SHORTFALL := "ev_reserve_shortfall",
         EV_POWER_MAX_CHARGE_PRICE := "ev_power_max_charge_price",
         EV_POWER_MAX_DISCHARGE_PRICE := "ev_power_max_discharge_price",
     )
@@ -135,8 +140,9 @@ class EvAdapter:
 
         capacity = vehicle[CONF_CAPACITY]
         capacity_first = float(capacity[0])
-        # current_soc is already a 0-1 ratio (the loader converts percent fields)
-        initial_charge = vehicle[CONF_CURRENT_SOC] * capacity_first
+        # current_soc is already a 0-1 ratio (the loader converts percent
+        # fields); clamp so a glitched sensor cannot make the model infeasible
+        initial_charge = min(max(vehicle[CONF_CURRENT_SOC], 0.0), 1.0) * capacity_first
         energy_per_distance = float(vehicle[CONF_ENERGY_PER_DISTANCE])
 
         max_charge = charging[CONF_MAX_CHARGE_RATE]
@@ -158,21 +164,29 @@ class EvAdapter:
         connected_flag = _combine_connected(calendar, connected_live)
         away_flag = _invert_flag(connected_flag)
 
-        trip_initial = _trip_progress_energy(trip, energy_per_distance, connected_flag, trip_required)
+        trip_initial = _trip_progress_energy(trip, energy_per_distance, connected_flag)
 
         # Home charging limits zeroed while away via connected_flag
         home_max_charge = _apply_connected_mask(max_charge, connected_flag)
         home_max_discharge = _apply_connected_mask(max_discharge, connected_flag)
 
+        # EV pack battery, with reserve demand pricing at trip window ends
+        pack: BatteryElementConfig = {
+            "element_type": MODEL_ELEMENT_TYPE_BATTERY,
+            "name": name,
+            "capacity": capacity,
+            "initial_charge": initial_charge,
+            "salvage_value": 0.0,
+        }
+        reserve = _reserve_config(config, calendar)
+        if reserve is not None:
+            pack["reserve_level"] = reserve.level
+            pack["reserve_mask"] = reserve.mask
+            pack["reserve_price"] = reserve.price
+
         return [
             # 1. EV Battery
-            {
-                "element_type": MODEL_ELEMENT_TYPE_BATTERY,
-                "name": name,
-                "capacity": capacity,
-                "initial_charge": initial_charge,
-                "salvage_value": 0.0,
-            },
+            pack,
             # 2. Home charging: network → EV
             {
                 "element_type": MODEL_ELEMENT_TYPE_CONNECTION,
@@ -297,6 +311,11 @@ class EvAdapter:
         trip_deficit = expect_output_data(trip_outputs[DEFERRABLE_LOAD_ENERGY_DEFICIT])
         ev_outputs[EV_TRIP_ENERGY_DEFICIT] = replace(trip_deficit, type=OutputType.ENERGY)
 
+        # Reserve shortfall, only when a reserve is configured
+        if config.get(SECTION_TRIP, {}).get(CONF_RESERVE_SOC) is not None:
+            reserve = expect_output_data(battery_outputs[BATTERY_RESERVE_SHORTFALL])
+            ev_outputs[EV_RESERVE_SHORTFALL] = replace(reserve, type=OutputType.ENERGY)
+
         # Shadow prices for the home charge/discharge power limits
         shadow_mappings: tuple[tuple[EvOutputName, Mapping[ModelOutputName, ModelOutputValue] | None], ...] = (
             (EV_POWER_MAX_CHARGE_PRICE, charge_conn),
@@ -356,13 +375,14 @@ def _trip_progress_energy(
     trip: Mapping[str, Any],
     energy_per_distance: float,
     connected_flag: NDArray[np.floating[Any]] | float | None,
-    trip_required: NDArray[np.float64] | float,
 ) -> float:
     """Energy already consumed on the current trip, from odometer readings.
 
     Only applies while the EV is away: the distance driven since disconnect
     counts toward the current trip's requirement so the optimizer does not
-    double-charge for distance already covered.
+    double-charge for distance already covered. The value is deliberately not
+    clamped to the trip requirement — a car that drove further than planned
+    reports more, and the deferrable load tolerates the overshoot.
     """
     if connected_flag is None:
         return 0.0
@@ -374,8 +394,58 @@ def _trip_progress_energy(
     if odometer is None or odometer_at_disconnect is None:
         return 0.0
 
-    progress = max(0.0, float(odometer) - float(odometer_at_disconnect)) * energy_per_distance
-    return min(progress, float(np.max(np.atleast_1d(trip_required))))
+    return max(0.0, float(odometer) - float(odometer_at_disconnect)) * energy_per_distance
+
+
+@dataclass(frozen=True)
+class _ReserveConfig:
+    """Battery reserve parameters derived from the trip configuration."""
+
+    level: NDArray[np.float64]
+    mask: NDArray[np.float64]
+    price: NDArray[np.floating[Any]] | float
+
+
+def _reserve_config(
+    config: EvConfigData,
+    calendar: CalendarBoundaryData | None,
+) -> _ReserveConfig | None:
+    """Battery reserve parameters from the trip reserve configuration.
+
+    The reserve is checked at each trip window's end — because the pack can
+    only drain while away, the level at a window's end is the lowest level
+    hit during that window, so one priced check per window prices the
+    window minimum (demand-level pricing). The price defaults to the public
+    charging price: the cost of restoring the buffer away from home.
+    """
+    trip = config.get(SECTION_TRIP, {})
+    reserve_soc = trip.get(CONF_RESERVE_SOC)
+    if reserve_soc is None or calendar is None:
+        return None
+
+    capacity = config[SECTION_VEHICLE][CONF_CAPACITY]
+    reserve_ratio = min(max(float(reserve_soc), 0.0), 1.0)
+    reserve_price = trip.get(CONF_RESERVE_PRICE)
+    if reserve_price is None:
+        reserve_price = _public_price(config)
+
+    return _ReserveConfig(
+        level=reserve_ratio * np.asarray(capacity, dtype=np.float64),
+        mask=(np.asarray(calendar["value_edge_end"], dtype=np.float64) > 0).astype(np.float64),
+        price=_to_boundaries(reserve_price, len(capacity)),
+    )
+
+
+def _to_boundaries(
+    value: NDArray[np.floating[Any]] | float,
+    n_boundaries: int,
+) -> NDArray[np.floating[Any]] | float:
+    """Extend an interval-shaped series to boundary length by repeating the end."""
+    if not isinstance(value, np.ndarray):
+        return value
+    if len(value) == n_boundaries - 1:
+        return np.append(value, value[-1])
+    return value
 
 
 def _apply_connected_mask(

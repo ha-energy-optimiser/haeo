@@ -17,6 +17,8 @@ from custom_components.haeo.core.schema.elements.ev import (
     CONF_ODOMETER,
     CONF_ODOMETER_AT_DISCONNECT,
     CONF_PUBLIC_CHARGING_PRICE,
+    CONF_RESERVE_PRICE,
+    CONF_RESERVE_SOC,
     CONF_TRIP_CALENDAR,
     ELEMENT_TYPE,
     SECTION_CHARGING,
@@ -64,7 +66,14 @@ class EvSubentryFlowHandler(ElementFlowMixin, ConfigSubentryFlow):
             ),
             SectionDefinition(
                 key=SECTION_TRIP,
-                fields=(CONF_TRIP_CALENDAR, CONF_CONNECTED, CONF_ODOMETER, CONF_ODOMETER_AT_DISCONNECT),
+                fields=(
+                    CONF_TRIP_CALENDAR,
+                    CONF_CONNECTED,
+                    CONF_ODOMETER,
+                    CONF_ODOMETER_AT_DISCONNECT,
+                    CONF_RESERVE_SOC,
+                    CONF_RESERVE_PRICE,
+                ),
                 collapsed=True,
             ),
             SectionDefinition(

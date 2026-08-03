@@ -17,6 +17,8 @@ from custom_components.haeo.core.schema.elements.ev import (
     CONF_ODOMETER,
     CONF_ODOMETER_AT_DISCONNECT,
     CONF_PUBLIC_CHARGING_PRICE,
+    CONF_RESERVE_PRICE,
+    CONF_RESERVE_SOC,
     CONF_TRIP_CALENDAR,
     SECTION_CHARGING,
     SECTION_PUBLIC_CHARGING,
@@ -53,6 +55,8 @@ VALID_DATA = [
                 CONF_CONNECTED: as_entity_value(["binary_sensor.ev_plugged_in"]),
                 CONF_ODOMETER: as_entity_value(["sensor.ev_odometer"]),
                 CONF_ODOMETER_AT_DISCONNECT: as_entity_value(["sensor.ev_odometer_at_disconnect"]),
+                CONF_RESERVE_SOC: as_constant_value(20.0),
+                CONF_RESERVE_PRICE: as_constant_value(0.6),
             },
             SECTION_PUBLIC_CHARGING: {
                 CONF_PUBLIC_CHARGING_PRICE: as_constant_value(0.35),
