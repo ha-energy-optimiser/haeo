@@ -67,7 +67,7 @@ class DeferrableLoadElementConfig(TypedDict):
     capacity: NDArray[np.floating[Any]] | float
     required: NDArray[np.floating[Any]] | float
     initial_energy: NotRequired[float]
-    deficit_price: float
+    deficit_price: NDArray[np.floating[Any]] | float
     overage_price: NotRequired[float]
     outbound_tags: NotRequired[set[int] | None]
     inbound_tags: NotRequired[set[int] | None]
@@ -85,15 +85,16 @@ class DeferrableLoad(NetworkElement[DeferrableLoadOutputName]):
 
     The deficit variable is non-decreasing, so a shortfall against the
     requirement at any boundary stays locked in even if absorption later
-    catches up. The final deficit is priced at ``deficit_price`` and any
-    absorption beyond the final requirement at ``overage_price``.
+    catches up. Each deficit increment is priced at ``deficit_price`` for
+    the boundary where it locks in (a scalar applies uniformly), and any
+    absorption beyond the final requirement is priced at ``overage_price``.
     """
 
     # Parameters
     capacity: TrackedParam[NDArray[np.float64]] = TrackedParam()
     required: TrackedParam[NDArray[np.float64]] = TrackedParam()
     initial_energy: TrackedParam[float] = TrackedParam()
-    deficit_price: TrackedParam[float] = TrackedParam()
+    deficit_price: TrackedParam[NDArray[np.float64]] = TrackedParam()
     overage_price: TrackedParam[float] = TrackedParam()
 
     def __init__(
@@ -104,7 +105,7 @@ class DeferrableLoad(NetworkElement[DeferrableLoadOutputName]):
         solver: Highs,
         capacity: NDArray[np.floating[Any]] | float,
         required: NDArray[np.floating[Any]] | float,
-        deficit_price: float,
+        deficit_price: NDArray[np.floating[Any]] | float,
         initial_energy: float = 0.0,
         overage_price: float = 0.0,
         outbound_tags: set[int] | None = None,
@@ -125,7 +126,7 @@ class DeferrableLoad(NetworkElement[DeferrableLoadOutputName]):
         self.capacity = broadcast_to_sequence(capacity, n_periods + 1)
         self.required = broadcast_to_sequence(required, n_periods + 1)
         self.initial_energy = initial_energy
-        self.deficit_price = deficit_price
+        self.deficit_price = broadcast_to_sequence(deficit_price, n_periods + 1)
         self.overage_price = overage_price
 
         # Cumulative absorbed energy (including initial state at t=0)
@@ -166,9 +167,14 @@ class DeferrableLoad(NetworkElement[DeferrableLoadOutputName]):
     def deferrable_load_capacity(self) -> list[highs_linear_expression]:
         """Constraint: absorbed energy cannot exceed the opened capacity.
 
+        Live telemetry can report more energy already absorbed than the
+        schedule planned for (e.g. an EV that drove further than forecast),
+        so the effective capacity never sits below the initial energy —
+        stale telemetry must not make the optimization infeasible.
+
         Output: shadow price indicating the marginal value of additional capacity.
         """
-        return list(self.energy[1:] <= self.capacity[1:])
+        return list(self.energy[1:] <= np.maximum(self.capacity[1:], self.initial_energy))
 
     @constraint(output=True, unit="$/kWh")
     def deferrable_load_requirement(self) -> list[highs_linear_expression]:
@@ -189,8 +195,14 @@ class DeferrableLoad(NetworkElement[DeferrableLoadOutputName]):
 
     @constraint
     def deferrable_load_overage(self) -> highs_linear_expression:
-        """Constraint: overage covers absorption beyond the final requirement."""
-        return self.overage[0] >= self.energy[-1] - self.required[-1]
+        """Constraint: overage covers absorption beyond the final requirement.
+
+        Energy already absorbed before the horizon is not overage — an
+        overshoot reported by live telemetry is a fact, not a decision to
+        price.
+        """
+        baseline = np.maximum(self.required[-1], self.initial_energy)
+        return self.overage[0] >= self.energy[-1] - baseline
 
     def element_power_produced(self) -> HighspyArray | None:
         """Deferrable loads never produce power."""
@@ -202,8 +214,12 @@ class DeferrableLoad(NetworkElement[DeferrableLoadOutputName]):
 
     @cost
     def deferrable_load_deficit_cost(self) -> highs_linear_expression:
-        """Cost: the locked-in final shortfall priced at deficit_price."""
-        return self.deficit_price * self.deficit[-1]
+        """Cost: each locked-in deficit increment priced at its boundary.
+
+        With a scalar price this telescopes to price times the final deficit.
+        """
+        increments = self.deficit[1:] - self.deficit[:-1]
+        return (self.deficit_price[1:] * increments).sum()
 
     @cost
     def deferrable_load_overage_cost(self) -> highs_linear_expression:

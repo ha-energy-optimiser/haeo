@@ -173,3 +173,34 @@ def test_outputs_present() -> None:
     assert outputs["deferrable_load_energy_absorbed"].values[-1] == pytest.approx(5.0)
     assert outputs["deferrable_load_energy_deficit"].values[-1] == pytest.approx(0.0)
     assert len(outputs["deferrable_load_power"].values) == 2
+
+
+def test_initial_energy_beyond_capacity_stays_feasible() -> None:
+    """Telemetry reporting more absorbed than planned must not crash the model."""
+    network, load = _build_network(
+        capacity=np.array([3.0, 3.0, 3.0]),
+        required=np.array([0.0, 0.0, 3.0]),
+        initial_energy=5.0,  # the car drove further than the schedule planned
+    )
+
+    cost = network.optimize()
+
+    absorbed = load.extract_values(load.energy)
+    assert absorbed[0] == pytest.approx(5.0)
+    deficit = load.extract_values(load.deficit)
+    np.testing.assert_allclose(deficit, [0.0, 0.0, 0.0])
+    assert cost == pytest.approx(0.0)
+
+
+def test_initial_overshoot_is_not_priced_as_overage() -> None:
+    """An initial overshoot is a fact from telemetry, not priced overage."""
+    network, _load = _build_network(
+        capacity=np.array([4.0, 4.0, 4.0]),
+        required=np.array([0.0, 0.0, 4.0]),
+        initial_energy=6.0,
+        overage_price=100.0,
+    )
+
+    cost = network.optimize()
+
+    assert cost == pytest.approx(0.0)
