@@ -36,6 +36,8 @@ class UnitOfMeasurement(StrEnum):
     GIGA_WATT_HOUR = "GWh"
     DOLLAR_PER_KWH = "$/kWh"
     PERCENT = "%"
+    KILOMETER = "km"
+    KILO_WATT_HOUR_PER_KILOMETER = "kWh/km"
 
     @classmethod
     def of(cls, value: object) -> "UnitOfMeasurement | None":
