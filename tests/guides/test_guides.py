@@ -49,7 +49,6 @@ GUIDE_FILES = _discover_guide_files()
 
 
 @pytest.mark.guide
-@pytest.mark.enable_socket
 @pytest.mark.timeout(300)
 @pytest.mark.parametrize("dark_mode", [False, True], ids=["light", "dark"])
 @pytest.mark.parametrize(
@@ -57,7 +56,7 @@ GUIDE_FILES = _discover_guide_files()
     GUIDE_FILES,
     ids=lambda p: p.stem,
 )
-def test_guide(guide_md: Path, dark_mode: bool) -> None:
+def test_guide(guide_md: Path, dark_mode: bool, socket_enabled: None) -> None:
     """Run a guide's code blocks and capture screenshots.
 
     Each guide markdown file is run in both light and dark mode.

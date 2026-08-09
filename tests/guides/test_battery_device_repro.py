@@ -85,9 +85,8 @@ def _registry_summary(live: LiveHomeAssistant) -> dict[str, Any]:
 
 
 @pytest.mark.guide
-@pytest.mark.enable_socket
 @pytest.mark.timeout(300)
-def test_battery_gets_device_and_entities_like_grid() -> None:
+def test_battery_gets_device_and_entities_like_grid(socket_enabled: None) -> None:
     """A battery created via the real UI flow must register a device + entities."""
     environment = load_scenario_environment()
 
