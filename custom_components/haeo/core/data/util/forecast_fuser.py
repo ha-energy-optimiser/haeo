@@ -73,6 +73,16 @@ def fuse_to_boundaries(
     # Interpolate at boundary times
     values = np.interp(horizon_times, block_array["timestamp"], block_array["value"])
 
+    # Snap float-noise magnitudes to zero (issue #501). Cycle-wrapping in
+    # _build_extended_block applies np.mod to epoch-scale timestamps, shifting
+    # step edges by ~1e-7 s; interpolating a 0<->x price step at such an edge
+    # yields values like 1e-11. As objective costs these are harmless, but
+    # _constrain_objective turns the objective into a matrix row where HiGHS
+    # rejects |a_ij| < small_matrix_value (1e-9) with a warning that highspy
+    # escalates to "Error adding constraint" - orphaning the lex row and
+    # wedging every subsequent solve as Infeasible.
+    values[np.abs(values) < 1e-9] = 0.0
+
     # Replace position 0 with present_value if provided
     result = [float(v) for v in values]
     if present_value is not None:
@@ -137,7 +147,11 @@ def fuse_to_intervals(
 
         # Trapezoidal integration: area under curve divided by duration
         area = np.trapezoid(values, times)
-        result.append(float(area / interval_duration))
+        interval_value = float(area / interval_duration)
+        # Snap float-noise magnitudes to zero (see fuse_to_boundaries, issue #501).
+        if abs(interval_value) < 1e-9:
+            interval_value = 0.0
+        result.append(interval_value)
 
     # Replace first interval with present_value if provided
     if present_value is not None:

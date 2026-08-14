@@ -253,3 +253,54 @@ def test_fuse_to_boundaries_raises_when_no_data() -> None:
     """Test that missing both forecast_series and present_value raises ValueError."""
     with pytest.raises(ValueError, match="Either forecast_series or present_value must be provided"):
         fuse_to_boundaries(None, [], [0, 1000, 2000])
+
+
+def test_fuse_to_boundaries_snaps_float_noise_to_zero() -> None:
+    """Regression for issue #501.
+
+    Cycle-wrapping in ``_build_extended_block`` applies ``np.mod`` to
+    epoch-scale timestamps, which shifts step-edge times by ~1e-7 s.
+    Interpolating a 0<->x price step near such an edge produces values like
+    1e-11 instead of exact 0.0. Those tiny values are harmless as objective
+    costs, but ``_constrain_objective`` reifies the objective as a matrix
+    row, and HiGHS rejects coefficients below ``small_matrix_value`` (1e-9),
+    which highspy escalates to ``Error adding constraint`` -- orphaning the
+    lex row and wedging every subsequent solve as Infeasible. The fuser
+    therefore snaps ``|v| < 1e-9`` to exact 0.0 before the value can become
+    an LP coefficient.
+
+    We synthesise the failure by placing a boundary a small fraction of the
+    way up a 0 -> 0.35 ramp so that ``np.interp`` returns a sub-1e-9 value;
+    without the snap, position 1 is a float-noise ghost like 3.5e-12.
+    """
+    forecast_series = [(0, 0.0), (1000, 0.0), (1001, 0.35), (2000, 0.35)]
+    # Boundary sits 1e-11 s past the step start: interp yields ~3.5e-12.
+    horizon_times = [0, 1000 + 1e-11, 2000]
+
+    result = fuse_to_boundaries(None, forecast_series, horizon_times)
+
+    assert result[1] == 0.0, f"expected exact 0.0, got {result[1]!r}"
+    for i, v in enumerate(result):
+        assert v == 0.0 or abs(v) >= 1e-9, (
+            f"position {i}: value {v!r} is a sub-1e-9 nonzero (issue #501 signature)"
+        )
+
+
+def test_fuse_to_intervals_snaps_float_noise_to_zero() -> None:
+    """Regression for issue #501 on the trapezoidal branch.
+
+    Same failure mode as ``fuse_to_boundaries`` -- a narrow interval that
+    barely enters a 0 -> x ramp yields a trapezoidal average below 1e-9 and
+    must be snapped to exact 0.0.
+    """
+    forecast_series = [(0, 0.0), (1000, 0.0), (1001, 0.35), (2000, 0.35)]
+    # Interval [1000, 1000 + 2e-11] straddles a sliver of the ramp; trapezoidal
+    # average lands at ~3.5e-12 without the snap.
+    horizon_times = [0, 1000.0, 1000.0 + 2e-11, 2000]
+
+    result = fuse_to_intervals(None, forecast_series, horizon_times)
+
+    for i, v in enumerate(result):
+        assert v == 0.0 or abs(v) >= 1e-9, (
+            f"interval {i}: value {v!r} is a sub-1e-9 nonzero (issue #501 signature)"
+        )
