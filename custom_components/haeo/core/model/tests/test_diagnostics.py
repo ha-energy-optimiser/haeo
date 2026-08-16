@@ -287,3 +287,47 @@ def test_reported_conflicts_are_capped() -> None:
     message = report.as_log_message()
     assert message.rstrip().endswith("...")
     assert len(report.conflicts) == diagnostics.MAX_REPORTED_ROWS
+
+
+def test_unrun_solver_is_not_asked_for_an_iis() -> None:
+    """A model that has never solved is reported on without touching getIis.
+
+    HiGHS segfaults inside ``getIis`` when the model carries rows but no solve has
+    completed, which would take the whole process down rather than raise. Guard
+    the call so an unrun solver only ever costs us the conflict list.
+    """
+    solver = Highs()
+    solver.setOptionValue("output_flag", False)
+    x = solver.addVariable(lb=0, ub=10)
+    solver.addConstr(x >= 8)
+    solver.addConstr(x <= 3)
+
+    assert not diagnostics.solver_has_solved(solver)
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("getIis must not be called before a solve has completed")
+
+    solver.getIis = fail  # type: ignore[method-assign]
+
+    conflicts, truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    assert conflicts == ()
+    assert not truncated
+    assert note == "solver holds no completed solve to analyse"
+
+
+def test_solved_solver_is_analysed() -> None:
+    """Once a solve has completed the IIS is computed as normal."""
+    solver = Highs()
+    solver.setOptionValue("output_flag", False)
+    x = solver.addVariable(lb=0, ub=10)
+    solver.addConstr(x >= 8)
+    solver.addConstr(x <= 3)
+    solver.run()
+
+    assert diagnostics.solver_has_solved(solver)
+
+    conflicts, _truncated, note = diagnostics.compute_conflicts(solver, {0: "lower", 1: "upper"})
+
+    assert note is None
+    assert conflicts

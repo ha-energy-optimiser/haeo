@@ -192,6 +192,20 @@ def _describe_row(index: int, bound: int, row_names: dict[int, str]) -> str:
     return f"{label} ({bound_label} bound)" if bound_label else label
 
 
+def solver_has_solved(solver: Highs) -> bool:
+    """Report whether the solver holds information from a completed solve.
+
+    HiGHS segfaults inside ``getIis`` when asked to analyse a model that carries
+    rows but has never actually been run, so an IIS must only ever be requested
+    once a solve has genuinely completed. ``getInfo().valid`` is the solver's own
+    account of that, and anything we cannot read is treated as unsafe.
+    """
+    try:
+        return bool(solver.getInfo().valid)
+    except (AttributeError, TypeError):  # pragma: no cover - defensive
+        return False
+
+
 def compute_conflicts(
     solver: Highs,
     row_names: dict[int, str],
@@ -204,6 +218,9 @@ def compute_conflicts(
     """
     previous: Any = None
     restore = False
+
+    if not solver_has_solved(solver):
+        return (), False, "solver holds no completed solve to analyse"
 
     try:
         status, previous = solver.getOptionValue(IIS_STRATEGY_OPTION)
