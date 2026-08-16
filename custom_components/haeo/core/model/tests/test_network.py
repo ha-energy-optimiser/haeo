@@ -805,3 +805,30 @@ def test_add_policy_pricing_unknown_tag() -> None:
                 terms=[PolicyPricingTerm(connection="conn", tag=99)],
             )
         )
+
+
+def test_rejected_lex_row_logs_coefficient_magnitudes(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A row HiGHS refuses is re-raised, with the coefficient range recorded first.
+
+    highspy reports a rejected row only as an opaque "Error adding constraint to
+    the model.", which gives no way to see that a sub-tolerance coefficient was
+    the cause, so the magnitudes are logged before the error propagates.
+    """
+    network = Network(name="test", periods=np.array([1.0]))
+    h: Highs = network._solver
+    v = h.addVariable(lb=0.0, ub=10.0, name="v")
+
+    def reject(*_args: object, **_kwargs: object) -> None:
+        msg = "Error adding constraint to the model."
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(h, "addConstr", reject)
+
+    with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError, match="Error adding constraint"):
+        network._constrain_objective(1e-11 * v + 2.0 * v, 5.0)
+
+    # The failure must not leave a half-installed handle behind.
+    assert network._lex_constraint is None
