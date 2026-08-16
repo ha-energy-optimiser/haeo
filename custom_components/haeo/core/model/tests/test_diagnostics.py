@@ -63,6 +63,17 @@ def _feasible_network() -> Network:
     return network
 
 
+def _solved_infeasible_solver() -> Highs:
+    """Return a solver holding an infeasible model that has completed a solve."""
+    solver = Highs()
+    solver.setOptionValue("output_flag", False)
+    x = solver.addVariable(lb=0, ub=10)
+    solver.addConstr(x >= 8)
+    solver.addConstr(x <= 3)
+    solver.run()
+    return solver
+
+
 def test_conflicting_constraints_are_named() -> None:
     """An infeasible solve names the conflicting rows in network terms."""
     network = _infeasible_network()
@@ -331,3 +342,151 @@ def test_solved_solver_is_analysed() -> None:
 
     assert note is None
     assert conflicts
+
+
+def test_non_finite_coefficients_are_flagged() -> None:
+    """A NaN or inf coefficient is called out explicitly in the summary."""
+    solver = Highs()
+    solver.setOptionValue("output_flag", False)
+    x = solver.addVariable(lb=0, ub=1)
+    y = solver.addVariable(lb=0, ub=1)
+
+    stats = diagnostics.coefficient_stats(math.inf * x + 2.0 * y <= 1.0)
+
+    assert stats is not None
+    assert stats.non_finite == 1
+    assert "NON-FINITE" in str(stats)
+
+
+def test_all_zero_coefficients_report_zero_range() -> None:
+    """An expression whose coefficients are all zero yields a zero-count stat."""
+    solver = Highs()
+    solver.setOptionValue("output_flag", False)
+    x = solver.addVariable(lb=0, ub=1)
+
+    stats = diagnostics.coefficient_stats(0.0 * x <= 1.0)
+
+    assert stats is not None
+    assert stats.count == 0
+    assert stats.min_abs == 0.0
+    assert stats.max_abs == 0.0
+
+
+def test_exception_detail_lists_conflicts_and_marks_truncation() -> None:
+    """The exception detail carries the conflict list and an ellipsis when clipped."""
+    report = diagnostics.SolveDiagnostics(
+        phase="phase1",
+        status="Infeasible",
+        n_rows=5,
+        n_cols=5,
+        solves_since_build=0,
+        lex_row_installed=False,
+        conflicts=("a.b[0]", "c.d[1]"),
+        iis_truncated=True,
+        iis_note=None,
+    )
+
+    detail = report.as_exception_detail()
+
+    assert "conflicts=[a.b[0], c.d[1], ...]" in detail
+
+
+def test_unreadable_iis_strategy_option_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the current iis_strategy cannot be read, conflicts are skipped with a note."""
+    solver = _solved_infeasible_solver()
+    monkeypatch.setattr(solver, "getOptionValue", lambda _option: (HighsStatus.kError, 0))
+
+    conflicts, truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    assert conflicts == ()
+    assert not truncated
+    assert note == "could not read iis_strategy"
+
+
+def test_unsettable_iis_strategy_option_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If iis_strategy cannot be enabled, conflicts are skipped with a note."""
+    solver = _solved_infeasible_solver()
+    monkeypatch.setattr(solver, "setOptionValue", lambda *_args: HighsStatus.kError)
+
+    conflicts, _truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    assert conflicts == ()
+    assert note == "could not enable iis_strategy"
+
+
+def test_declined_iis_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A solver that refuses to compute an IIS produces a note, not an error."""
+    solver = _solved_infeasible_solver()
+    monkeypatch.setattr(solver, "getIis", lambda _iis: HighsStatus.kError)
+
+    conflicts, _truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    assert conflicts == ()
+    assert note == "solver declined to compute an IIS"
+
+
+def test_invalid_iis_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An IIS returned as invalid is not read for row indices."""
+    solver = _solved_infeasible_solver()
+    monkeypatch.setattr(solver, "getIis", lambda _iis: HighsStatus.kOk)
+
+    conflicts, _truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    assert conflicts == ()
+    assert note == "solver returned no valid IIS"
+
+
+def test_failure_to_restore_iis_strategy_is_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failure while restoring the option must not mask the diagnostic."""
+    solver = _solved_infeasible_solver()
+    calls: list[object] = []
+    real_set = solver.setOptionValue
+
+    def flaky(option: str, value: Any) -> HighsStatus:
+        calls.append(value)
+        if len(calls) > 1:
+            msg = "restore failed"
+            raise RuntimeError(msg)
+        return real_set(option, value)
+
+    monkeypatch.setattr(solver, "setOptionValue", flaky)
+
+    conflicts, _truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    # The restore was attempted and its failure did not propagate.
+    assert len(calls) == 2
+    assert note is None
+    assert conflicts
+
+
+def test_unreadable_model_dimensions_fall_back_to_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the solver cannot report its own size, collection still succeeds."""
+    solver = _solved_infeasible_solver()
+    monkeypatch.setattr(
+        type(solver),
+        "numConstrs",
+        property(lambda _self: (_ for _ in ()).throw(RuntimeError("no dimensions"))),
+        raising=False,
+    )
+
+    report = diagnostics.collect(solver, phase="phase1", status="Infeasible", with_conflicts=False)
+
+    assert report.n_rows == -1
+    assert report.n_cols == -1
+
+
+def test_raising_iis_call_is_reported_as_a_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A throwing IIS call is downgraded to a note, never masking the real failure."""
+    solver = _solved_infeasible_solver()
+
+    def explode(_iis: object) -> None:
+        msg = "iis exploded"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(solver, "getIis", explode)
+
+    conflicts, truncated, note = diagnostics.compute_conflicts(solver, {})
+
+    assert conflicts == ()
+    assert not truncated
+    assert note == "RuntimeError"
