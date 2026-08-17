@@ -38,6 +38,9 @@ docs/**/dark/
 # Node modules
 node_modules/
 
+# WASM build artifacts
+wasm/dist/
+
 custom_components/hacs/
 
 # Agent permission grants are a per-developer, per-environment trust decision.
